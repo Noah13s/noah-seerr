@@ -5,6 +5,10 @@ sidebar_position: 1
 
 # Introduction
 
+For this fork's custom player, watch history, development and deployment scope,
+start with the [Noah Seerr documentation](noah/README.md). The material below
+describes standard upstream Seerr features and settings.
+
 Welcome to the Seerr Documentation.
 
 **Seerr** is a free and open source software application for managing requests for your media library. It integrates with the media server of your choice: [Jellyfin](https://jellyfin.org), [Plex](https://plex.tv), and [Emby](https://emby.media/). In addition, it integrates with your existing services, such as **[Sonarr](https://sonarr.tv/)**, **[Radarr](https://radarr.video/)**.

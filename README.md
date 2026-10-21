@@ -1,77 +1,56 @@
-<p align="center">
-<img src="./public/logo_full.svg" alt="Seerr" style="margin: 20px 0;">
-</p>
-<p align="center">
-<img src="https://github.com/seerr-team/seerr/actions/workflows/release.yml/badge.svg" alt="Seerr Release" />
-<img src="https://github.com/seerr-team/seerr/actions/workflows/ci.yml/badge.svg" alt="Seerr CI">
-</p>
-<p align="center">
-<a href="https://discord.gg/seerr"><img src="https://img.shields.io/discord/783137440809746482" alt="Discord"></a>
-<a href="https://hub.docker.com/r/seerr/seerr"><img src="https://img.shields.io/docker/pulls/seerr/seerr" alt="Docker pulls"></a>
-<a href="https://translate.seerr.dev/engage/seerr/"><img src="https://translate.seerr.dev/widget/seerr/svg-badge.svg" alt="Translation status" /></a>
-<a href="https://github.com/seerr-team/seerr/blob/develop/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/seerr-team/seerr"></a>
+# Noah Seerr
 
-**Seerr** is a free and open source software application for managing requests for your media library. It integrates with the media server of your choice: [Jellyfin](https://jellyfin.org), [Plex](https://plex.tv), and [Emby](https://emby.media/). In addition, it integrates with your existing services, such as **[Sonarr](https://sonarr.tv/)**, **[Radarr](https://radarr.video/)**.
+<img src="public/logo_full.svg" alt="Seerr" width="220">
 
-## Current Features
+The customized **Noah Stream website and playback host**, forked from
+[Seerr](https://github.com/seerr-team/seerr) v3.5.0. Users browse and request
+media here, manage their own watch history, and play through the integrated
+[Jellyfin Web fork](https://github.com/Noah13s/noah-jellyfin-web).
 
-- Full Jellyfin/Emby/Plex integration including authentication with user import & management.
-- Support for **PostgreSQL** and **SQLite** databases.
-- Supports Movies, Shows and Mixed Libraries.
-- Ability to change email addresses for SMTP purposes.
-- Easy integration with your existing services. Currently, Seerr supports Sonarr and Radarr. More to come!
-- Jellyfin/Emby/Plex library scan, to keep track of the titles which are already available.
-- Customizable request system, which allows users to request individual seasons or movies in a friendly, easy-to-use interface.
-- Incredibly simple request management UI. Don't dig through the app to simply approve recent requests!
-- Granular permission system.
-- Support for various notification agents.
-- Mobile-friendly design, for when you need to approve requests on the go!
-- Support for watchlisting & blocklisting media.
+## What belongs here?
 
-With more features on the way! Check out our [issue tracker](/../../issues) to see the features which have already been requested.
+| Area | Responsibility |
+| --- | --- |
+| Browsing | Movies, series, optional anime, discovery sliders, watchlist and Continue Watching |
+| Watch history | Per-profile progress, rewatch resume, episode overrides and star ratings |
+| Playback host | Preparation, scoped Jellyfin sessions, protocol 1 bridge and Seerr Cast controls |
+| Accounts | Login, device pairing, preferences and permissions |
+| Administration | Integrated service tools, notifications and media cleanup review |
+| Upstream foundation | Request workflows, Sonarr/Radarr integration, library sync and settings |
 
-## Getting Started
+**Deployment boundary:** current fork CI validates the bridge and Next frontend.
+Production retains a separately validated custom backend image. This checkout's
+auth routes reference a runtime helper maintained in the private integration
+repo; a fresh full-server build is not a drop-in production replacement.
+Read [installation scope](docs/noah/installation.md) before starting.
 
-Check out our documentation for instructions on how to install and run Seerr:
+## Documentation
 
-https://docs.seerr.dev/getting-started/
+| Goal | Guide |
+| --- | --- |
+| Global summary and source ownership | [Documentation index](docs/noah/README.md) |
+| Understand requests, progress and player hosting | [Architecture](docs/noah/architecture.md) |
+| Install dependencies or set up development | [Installation](docs/noah/installation.md) |
+| Change and test the code | [Development](docs/noah/development.md) |
+| Deploy, update upstream or roll back | [Deployment and updates](docs/noah/deployment.md) |
+| Understand playback and profile behavior | [Playback and user features](docs/noah/playback.md) |
+| Investigate an issue | [Troubleshooting](docs/noah/troubleshooting.md) |
+| Configure standard Seerr features | [Upstream documentation](docs/README.md) |
 
-## Preview
+## Related projects and release policy
 
-<img src="./public/preview.jpg" alt="Seerr application preview" />
+The browser engine lives in **noah-jellyfin-web**. The private **Noah Stream**
+repo owns the Flutter/native TV app, operational integration and release records.
+Jellyfin Server owns authorized media delivery and transcoding. The TV app uses
+media_kit/libmpv rather than the browser player.
 
-## Migrating from Overseerr/Jellyseerr to Seerr
+Keep custom work on reviewed `codex/` branches and preserve upstream ancestry.
+The fork tracks reviewed stable releases; upstream `develop` can legitimately
+contain unreleased commits. Build success does not prove live backend parity.
 
-Read our [release announcement](https://docs.seerr.dev/blog/seerr-release) to learn what Seerr means for Jellyseerr and Overseerr users.
+## Upstream and license
 
-Please follow our [migration guide](https://docs.seerr.dev/migration-guide) for detailed instructions on migrating from Overseerr or Jellyseerr.
-
-## Support
-
-- Check out the [Seerr Documentation](https://docs.seerr.dev) before asking for help. Your question might already be in the docs!
-- You can get support on [Discord](https://discord.gg/seerr).
-- You can ask questions in the Help category of our [GitHub Discussions](/../../discussions).
-- Bug reports and feature requests can be submitted via [GitHub Issues](/../../issues).
-
-## API Documentation
-
-You can access the API documentation from your local Seerr install at http://localhost:5055/api-docs
-
-## Community
-
-You can ask questions, share ideas, and more in [GitHub Discussions](/../../discussions).
-
-If you would like to chat with other members of our growing community, [join the Seerr Discord server](https://discord.gg/seerr)!
-
-Our [Code of Conduct](./CODE_OF_CONDUCT.md) applies to all Seerr community channels.
-
-## Contributing
-
-You can help improve Seerr too! Check out our [Contribution Guide](./CONTRIBUTING.md) to get started.
-
-## Contributors ✨
-
-[![Contributors](https://opencollective.com/seerr/contributors.svg?width=890)](https://opencollective.com/seerr/#backers)
-
-[![Become a Backer](https://opencollective.com/seerr/backers.svg)](https://opencollective.com/seerr/#backers)
-[![Become a Sponsor](https://opencollective.com/seerr/sponsors.svg)](https://opencollective.com/seerr/#sponsors)
+Seerr builds on the work of Seerr, Jellyseerr and Overseerr contributors. This
+fork retains the [MIT license](LICENSE), [contribution guide](CONTRIBUTING.md),
+[security policy](SECURITY.md) and upstream history. Report custom integration
+issues here with credentials removed from all evidence.
