@@ -29,10 +29,10 @@ const messages = defineMessages('components.PlayButton', {
     'Your Jellyfin account must be linked once in Profile > Linked accounts.',
   playerUnavailable:
     'The player cannot be prepared right now. Please try again shortly.',
-  connecting: 'Connecting to playerÃ¢â‚¬Â¦',
+  connecting: 'Connecting to player\u2026',
   backToSeerr: 'Back to Seerr',
-  starting: 'Starting playbackÃ¢â‚¬Â¦',
-  optimizing: 'Optimizing playback for your deviceÃ¢â‚¬Â¦',
+  starting: 'Starting playback\u2026',
+  optimizing: 'Optimizing playback for your device\u2026',
   resume: 'Resume',
   progress: '{percent}% watched',
   rateTitle: 'Rate {title}',
@@ -81,7 +81,7 @@ const youtubeEmbedUrl = (url: string): string => {
       )}?autoplay=1&rel=0`;
     }
   } catch {
-    // L'URL Jellyfin peut ÃƒÂªtre relative ; elle est valide telle quelle.
+    // A Jellyfin URL can be relative; keep it unchanged.
   }
   return url;
 };
@@ -521,14 +521,14 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
           className="media-action media-action-play"
           aria-label={
             hasResume
-              ? `${intl.formatMessage(messages.resume)} Ã‚Â· ${Math.round(
+              ? `${intl.formatMessage(messages.resume)} \u00b7 ${Math.round(
                   resumePercent
                 )}%`
               : links[0].text
           }
           title={
             hasResume
-              ? `${intl.formatMessage(messages.resume)} Ã‚Â· ${Math.round(
+              ? `${intl.formatMessage(messages.resume)} \u00b7 ${Math.round(
                   resumePercent
                 )}%`
               : links[0].text

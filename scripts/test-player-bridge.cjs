@@ -77,3 +77,15 @@ test('document replacement retires the endpoint without stopping the new documen
   f.send({ kind: 'event', event: 'ready' });
   assert.equal(f.sent.filter(x => x.action === 'play').length, 0);
 });
+
+test('player labels and French playback messages contain no misdecoded UTF-8', () => {
+  const fs = require('node:fs');
+  const source = fs.readFileSync('src/components/Common/PlayButton/index.tsx', 'utf8');
+  const broken = /[\u00c2\u00c3\ufffd]|\u00e2\u20ac/;
+  assert.doesNotMatch(source, broken);
+  const french = JSON.parse(fs.readFileSync('src/i18n/locale/fr.json', 'utf8'));
+  for (const [key, text] of Object.entries(french)) {
+    if (key.startsWith('components.PlayButton.')) assert.doesNotMatch(text, broken, key);
+  }
+  assert.equal(french['components.PlayButton.starting'], 'D\u00e9marrage de la lecture\u2026');
+});
