@@ -15,9 +15,8 @@ export interface TmdbTitleCardProps {
   mutateParent?: () => void;
 }
 
-const isMovie = (movie: MovieDetails | TvDetails): movie is MovieDetails => {
-  return (movie as MovieDetails).title !== undefined;
-};
+const isMovie = (movie: MovieDetails | TvDetails): movie is MovieDetails =>
+  (movie as MovieDetails).title !== undefined;
 
 const TmdbTitleCard = ({
   id,
@@ -29,14 +28,11 @@ const TmdbTitleCard = ({
   mutateParent,
 }: TmdbTitleCardProps) => {
   const { hasPermission } = useUser();
-
-  const { ref, inView } = useInView({
-    triggerOnce: true,
-  });
+  const { ref, inView } = useInView({ triggerOnce: true });
   const url =
     type === 'movie' ? `/api/v1/movie/${tmdbId}` : `/api/v1/tv/${tmdbId}`;
   const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    inView ? `${url}` : null
+    inView ? url : null
   );
 
   if (!title && !error) {
@@ -58,37 +54,37 @@ const TmdbTitleCard = ({
     ) : null;
   }
 
+  const addedToWatchlist = Boolean(
+    title.onUserWatchlist || isAddedToWatchlist
+  );
+
   return isMovie(title) ? (
     <TitleCard
-      key={title.id}
+      key={`${title.id}-${addedToWatchlist}`}
       id={title.id}
-      isAddedToWatchlist={
-        title.mediaInfo?.watchlists?.length || isAddedToWatchlist
-      }
+      isAddedToWatchlist={addedToWatchlist}
       image={title.posterPath}
       status={title.mediaInfo?.status}
       summary={title.overview}
       title={title.title}
       userScore={title.voteAverage}
       year={title.releaseDate}
-      mediaType={'movie'}
+      mediaType="movie"
       canExpand={canExpand}
       mutateParent={mutateParent}
     />
   ) : (
     <TitleCard
-      key={title.id}
+      key={`${title.id}-${addedToWatchlist}`}
       id={title.id}
-      isAddedToWatchlist={
-        title.mediaInfo?.watchlists?.length || isAddedToWatchlist
-      }
+      isAddedToWatchlist={addedToWatchlist}
       image={title.posterPath}
       status={title.mediaInfo?.status}
       summary={title.overview}
       title={title.name}
       userScore={title.voteAverage}
       year={title.firstAirDate}
-      mediaType={'tv'}
+      mediaType="tv"
       canExpand={canExpand}
       mutateParent={mutateParent}
     />

@@ -15,7 +15,12 @@ const messages = defineMessages('components.Discover.DiscoverWatchlist', {
   watchlist: 'Plex Watchlist',
 });
 
-const DiscoverWatchlist = () => {
+interface DiscoverWatchlistProps {
+  embedded?: boolean;
+  onChanged?: () => void;
+}
+
+const DiscoverWatchlist = ({ embedded = false, onChanged }: DiscoverWatchlistProps) => {
   const intl = useIntl();
   const router = useRouter();
   const { user } = useUser({
@@ -50,6 +55,24 @@ const DiscoverWatchlist = () => {
     router.query.userId ? messages.watchlist : messages.discoverwatchlist
   );
 
+  const list = (
+    <ListView
+      plexItems={titles}
+      isEmpty={isEmpty}
+      isLoading={
+        isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)
+      }
+      isReachingEnd={isReachingEnd}
+      onScrollBottom={fetchMore}
+      mutateParent={() => {
+        mutate?.();
+        onChanged?.();
+      }}
+    />
+  );
+
+  if (embedded) return list;
+
   return (
     <>
       <PageTitle
@@ -70,16 +93,7 @@ const DiscoverWatchlist = () => {
           {title}
         </Header>
       </div>
-      <ListView
-        plexItems={titles}
-        isEmpty={isEmpty}
-        isLoading={
-          isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)
-        }
-        isReachingEnd={isReachingEnd}
-        onScrollBottom={fetchMore}
-        mutateParent={mutate}
-      />
+      {list}
     </>
   );
 };

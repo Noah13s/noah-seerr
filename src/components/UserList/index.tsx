@@ -54,6 +54,8 @@ const messages = defineMessages('components.UserList', {
   accounttype: 'Type',
   role: 'Role',
   created: 'Joined',
+  lastactive: 'Last activity',
+  noactivity: 'Not recorded yet',
   bulkedit: 'Bulk Edit',
   owner: 'Owner',
   admin: 'Admin',
@@ -89,6 +91,7 @@ const messages = defineMessages('components.UserList', {
   sortByType: 'Sort by account type',
   sortByRole: 'Sort by user role',
   sortByJoined: 'Sort by join date',
+  sortByLastActive: 'Sort by last activity',
   toggleSortDirection: 'Click again to sort {direction}',
   toggleSortDirectionAria: 'Toggle sort direction',
   ascending: 'ascending',
@@ -101,6 +104,7 @@ const messages = defineMessages('components.UserList', {
 type Sort =
   | 'created'
   | 'updated'
+  | 'lastactive'
   | 'requests'
   | 'displayname'
   | 'usertype'
@@ -128,7 +132,7 @@ const UserList = () => {
   const isSearchFocusedRef = useRef(false);
 
   const defaultSortDirection = (sortKey: Sort): SortDirection =>
-    sortKey === 'requests' || sortKey === 'updated' ? 'desc' : 'asc';
+    sortKey === 'requests' || sortKey === 'updated' || sortKey === 'lastactive' ? 'desc' : 'asc';
 
   const [sortDirection, setSortDirection] = useState<SortDirection>(() =>
     defaultSortDirection('created')
@@ -146,6 +150,12 @@ const UserList = () => {
     }`,
     { keepPreviousData: true }
   );
+
+  useEffect(() => {
+    const refreshActivity = () => { void revalidate(); };
+    window.addEventListener('seerr-user-activity-recorded', refreshActivity);
+    return () => window.removeEventListener('seerr-user-activity-recorded', refreshActivity);
+  }, [revalidate]);
 
   const handleSortChange = (sortKey: Sort) => {
     if (currentSort === sortKey) {
@@ -234,6 +244,8 @@ const UserList = () => {
           return intl.formatMessage(messages.sortByRole);
         case 'created':
           return intl.formatMessage(messages.sortByJoined);
+        case 'lastactive':
+          return intl.formatMessage(messages.sortByLastActive);
         default:
           return intl.formatMessage(messages.sortBy, { field: sortKey });
       }
@@ -744,6 +756,9 @@ const UserList = () => {
                 <option value="created">
                   {intl.formatMessage(messages.created)}
                 </option>
+                <option value="lastactive">
+                  {intl.formatMessage(messages.lastactive)}
+                </option>
               </select>
             </div>
           </div>
@@ -804,6 +819,14 @@ const UserList = () => {
               onSortChange={handleSortChange}
             >
               {intl.formatMessage(messages.created)}
+            </SortableColumnHeader>
+            <SortableColumnHeader
+              sortKey="lastactive"
+              currentSort={currentSort}
+              sortDirection={sortDirection}
+              onSortChange={handleSortChange}
+            >
+              {intl.formatMessage(messages.lastactive)}
             </SortableColumnHeader>
             <Table.TH className="w-1/12 min-w-[12rem] whitespace-nowrap text-right">
               {(data.results ?? []).length > 1 && (
@@ -929,6 +952,17 @@ const UserList = () => {
                   day: 'numeric',
                 })}
               </Table.TD>
+              <Table.TD>
+                {user.lastActiveAt
+                  ? intl.formatDate(user.lastActiveAt, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })
+                  : intl.formatMessage(messages.noactivity)}
+              </Table.TD>
               <Table.TD alignText="right">
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 sm:gap-2">
                   <Button
@@ -959,7 +993,7 @@ const UserList = () => {
             </tr>
           ))}
           <tr className="bg-gray-700">
-            <Table.TD colSpan={8} noPadding>
+            <Table.TD colSpan={9} noPadding>
               <nav
                 className="flex w-screen flex-col items-center space-x-4 space-y-3 px-6 py-3 sm:flex-row sm:space-y-0 lg:w-full"
                 aria-label="Pagination"

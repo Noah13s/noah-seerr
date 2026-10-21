@@ -5,6 +5,7 @@ import Modal from '@app/components/Common/Modal';
 import type { RequestOverrides } from '@app/components/RequestModal/AdvancedRequester';
 import AdvancedRequester from '@app/components/RequestModal/AdvancedRequester';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -55,6 +56,7 @@ const CollectionRequestModal = ({
     revalidateOnMount: true,
   });
   const intl = useIntl();
+  const settings = useSettings();
   const { user, hasPermission } = useUser();
   const { data: quota } = useSWR<QuotaResponse>(
     user &&
@@ -68,7 +70,10 @@ const CollectionRequestModal = ({
 
   const getAllParts = (): number[] => {
     return (data?.parts ?? [])
-      .filter((part) => part.mediaInfo?.status !== MediaStatus.BLOCKLISTED)
+      .filter((part) =>
+        settings.currentSettings.blocklistEnabled === false ||
+        part.mediaInfo?.status !== MediaStatus.BLOCKLISTED
+      )
       .map((part) => part.id);
   };
 
@@ -360,7 +365,7 @@ const CollectionRequestModal = ({
                 <tbody className="divide-y divide-gray-700">
                   {data?.parts
                     .filter((part) => {
-                      if (!blocklistVisibility)
+                      if (settings.currentSettings.blocklistEnabled !== false && !blocklistVisibility)
                         return (
                           part.mediaInfo?.status !== MediaStatus.BLOCKLISTED
                         );
@@ -373,7 +378,10 @@ const CollectionRequestModal = ({
                         part.mediaInfo[is4k ? 'status4k' : 'status'] !==
                           MediaStatus.UNKNOWN &&
                         part.mediaInfo[is4k ? 'status4k' : 'status'] !==
-                          MediaStatus.DELETED
+                          MediaStatus.DELETED &&
+                        !(settings.currentSettings.blocklistEnabled === false &&
+                          part.mediaInfo[is4k ? 'status4k' : 'status'] ===
+                            MediaStatus.BLOCKLISTED)
                           ? part.mediaInfo
                           : undefined;
 

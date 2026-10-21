@@ -14,6 +14,8 @@ const defaultSettings = {
   applicationUrl: '',
   hideAvailable: false,
   hideBlocklisted: false,
+  issuesEnabled: true,
+  blocklistEnabled: true,
   hideRequested: false,
   localLogin: true,
   mediaServerLogin: true,

@@ -3,6 +3,7 @@ import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import type { MediaResultsResponse } from '@server/interfaces/api/mediaInterfaces';
+import axios from 'axios';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -12,9 +13,13 @@ const messages = defineMessages('components.Discover.RecentlyAddedSlider', {
 
 const RecentlyAddedSlider = () => {
   const intl = useIntl();
-  const { hasPermission } = useUser();
+  const { user, hasPermission } = useUser();
   const { data: media, error: mediaError } = useSWR<MediaResultsResponse>(
-    '/api/v1/media?filter=allavailable&take=20&sort=mediaAdded',
+    user
+      ? ['/api/v1/media?filter=allavailable&take=20&sort=mediaAdded', user.id]
+      : null,
+    ([url]: [string, number]) =>
+      axios.get<MediaResultsResponse>(url).then(({ data }) => data),
     { revalidateOnMount: true }
   );
 

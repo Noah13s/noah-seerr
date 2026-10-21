@@ -127,6 +127,14 @@ const DiscoverSliderEdit = ({
 
   const getSliderTitle = (slider: Partial<DiscoverSlider>): string => {
     switch (slider.type) {
+      case DiscoverSliderType.CONTINUE_WATCHING:
+        return intl.formatMessage(sliderTitles.continueWatching);
+      case DiscoverSliderType.PERSONAL_RECOMMENDATIONS:
+        return intl.formatMessage(sliderTitles.personalRecommendations);
+      case DiscoverSliderType.POPULAR_ANIME_TV:
+        return intl.formatMessage(sliderTitles.animeSeries);
+      case DiscoverSliderType.POPULAR_ANIME_MOVIES:
+        return intl.formatMessage(sliderTitles.animeMovies);
       case DiscoverSliderType.RECENTLY_ADDED:
         return intl.formatMessage(sliderTitles.recentlyAdded);
       case DiscoverSliderType.RECENT_REQUESTS:

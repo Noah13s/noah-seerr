@@ -271,6 +271,8 @@ const RequestButton = ({
   if (
     (!media ||
       media.status === MediaStatus.UNKNOWN ||
+      (media.status === MediaStatus.BLOCKLISTED &&
+        settings.currentSettings.blocklistEnabled === false) ||
       (media.status === MediaStatus.DELETED && !activeRequest)) &&
     hasPermission(
       [
@@ -298,7 +300,8 @@ const RequestButton = ({
       type: 'or',
     }) &&
     media &&
-    media.status !== MediaStatus.BLOCKLISTED &&
+    (media.status !== MediaStatus.BLOCKLISTED ||
+      settings.currentSettings.blocklistEnabled === false) &&
     !isShowComplete
   ) {
     buttons.push({
@@ -316,6 +319,8 @@ const RequestButton = ({
   if (
     (!media ||
       media.status4k === MediaStatus.UNKNOWN ||
+      (media.status4k === MediaStatus.BLOCKLISTED &&
+        settings.currentSettings.blocklistEnabled === false) ||
       (media.status4k === MediaStatus.DELETED && !active4kRequest)) &&
     hasPermission(
       [
@@ -345,7 +350,8 @@ const RequestButton = ({
       type: 'or',
     }) &&
     media &&
-    media.status4k !== MediaStatus.BLOCKLISTED &&
+    (media.status4k !== MediaStatus.BLOCKLISTED ||
+      settings.currentSettings.blocklistEnabled === false) &&
     !is4kShowComplete &&
     settings.currentSettings.series4kEnabled
   ) {
@@ -399,7 +405,7 @@ const RequestButton = ({
           </>
         }
         onClick={buttonOne.action}
-        className="ml-2"
+        className="media-action"
       >
         {others && others.length > 0
           ? others.map((button) => (

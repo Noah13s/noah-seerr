@@ -133,7 +133,7 @@
   }
 
   .media-header {
-    @apply flex flex-col items-center pt-4 xl:flex-row xl:items-end;
+    @apply flex flex-col items-center pt-4 xl:flex-row xl:flex-wrap xl:items-end 2xl:flex-nowrap;
   }
 
   .media-poster {
@@ -141,7 +141,11 @@
   }
 
   .media-status {
-    @apply mb-2 space-x-2;
+    @apply mb-2 flex flex-wrap items-center justify-center gap-2 xl:justify-start;
+  }
+
+  .media-status > * {
+    @apply inline-flex min-h-6 items-center;
   }
 
   .media-title {
@@ -165,11 +169,37 @@
   }
 
   .media-actions {
-    @apply relative mt-4 flex flex-shrink-0 flex-wrap items-center justify-center sm:flex-nowrap sm:justify-end xl:mt-0;
+    @apply relative mt-4 flex w-full flex-shrink-0 flex-wrap items-start justify-center gap-x-2 xl:mt-3 xl:justify-end 2xl:mt-0 2xl:w-auto 2xl:flex-nowrap;
   }
 
   .media-actions > * {
-    @apply mb-3 sm:mb-0;
+    @apply mb-2 sm:mb-0;
+  }
+
+  .media-actions .media-action,
+  .media-actions .media-action + span > button {
+    @apply inline-flex min-w-10 items-center justify-center;
+    height: 2.5rem !important;
+    min-height: 2.5rem;
+  }
+
+  .media-actions .media-action-square {
+    @apply w-10;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  @media (max-width: 1535px) {
+    .media-actions .media-action-compact {
+      @apply w-10;
+      padding-right: 0 !important;
+      padding-left: 0 !important;
+    }
+
+    .media-actions .media-action-compact :where(svg),
+    .media-actions .media-action-play > svg {
+      @apply mx-0;
+    }
   }
 
   .media-overview {

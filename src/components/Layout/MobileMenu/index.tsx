@@ -1,28 +1,37 @@
 import Badge from '@app/components/Common/Badge';
 import { menuMessages } from '@app/components/Layout/Sidebar';
 import useClickOutside from '@app/hooks/useClickOutside';
+import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import { Transition } from '@headlessui/react';
 import {
+  ArrowDownTrayIcon,
   ClockIcon,
   CogIcon,
   EllipsisHorizontalIcon,
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
+  PhotoIcon,
   SparklesIcon,
+  StarIcon,
   TvIcon,
   UsersIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
 import {
+  ArrowDownTrayIcon as FilledArrowDownTrayIcon,
   ClockIcon as FilledClockIcon,
   CogIcon as FilledCogIcon,
   ExclamationTriangleIcon as FilledExclamationTriangleIcon,
   EyeSlashIcon as FilledEyeSlashIcon,
   FilmIcon as FilledFilmIcon,
+  PhotoIcon as FilledPhotoIcon,
   SparklesIcon as FilledSparklesIcon,
+  StarIcon as FilledStarIcon,
   TvIcon as FilledTvIcon,
   UsersIcon as FilledUsersIcon,
+  WrenchScrewdriverIcon as FilledWrenchScrewdriverIcon,
   XMarkIcon,
 } from '@heroicons/react/24/solid';
 import Link from 'next/link';
@@ -47,6 +56,7 @@ interface MenuLink {
   requiredPermission?: Permission | Permission[];
   permissionType?: 'and' | 'or';
   dataTestId?: string;
+  animeOnly?: boolean;
 }
 
 const MobileMenu = ({
@@ -57,8 +67,9 @@ const MobileMenu = ({
 }: MobileMenuProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const intl = useIntl();
+  const { currentSettings } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
-  const { hasPermission } = useUser();
+  const { hasPermission, user } = useUser();
   const router = useRouter();
   useClickOutside(ref, () => {
     setTimeout(() => {
@@ -93,11 +104,40 @@ const MobileMenu = ({
       activeRegExp: /^\/discover\/tv$/,
     },
     {
+      href: '/discover/anime',
+      content: intl.formatMessage(menuMessages.browseanime),
+      svgIcon: <PhotoIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledPhotoIcon className="h-6 w-6" />,
+      activeRegExp: /^\/discover\/anime$/,
+      animeOnly: true,
+    },
+    {
       href: '/requests',
       content: intl.formatMessage(menuMessages.requests),
       svgIcon: <ClockIcon className="h-6 w-6" />,
       svgIconSelected: <FilledClockIcon className="h-6 w-6" />,
       activeRegExp: /^\/requests/,
+    },
+    {
+      href: '/watch-history',
+      content: intl.formatMessage(menuMessages.history),
+      svgIcon: <StarIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledStarIcon className="h-6 w-6" />,
+      activeRegExp: /^\/watch-history/,
+    },
+    {
+      href: '/parties',
+      content: intl.formatMessage(menuMessages.parties),
+      svgIcon: <UsersIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledUsersIcon className="h-6 w-6" />,
+      activeRegExp: /^\/parties/,
+    },
+    {
+      href: '/offline',
+      content: intl.formatMessage(menuMessages.offline),
+      svgIcon: <ArrowDownTrayIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledArrowDownTrayIcon className="h-6 w-6" />,
+      activeRegExp: /^\/offline$/,
     },
     {
       href: '/blocklist',
@@ -142,14 +182,36 @@ const MobileMenu = ({
       requiredPermission: Permission.ADMIN,
       dataTestId: 'sidebar-menu-settings',
     },
+    {
+      href: '/admin-tools',
+      content: intl.formatMessage(menuMessages.adminTools),
+      svgIcon: <WrenchScrewdriverIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledWrenchScrewdriverIcon className="h-6 w-6" />,
+      activeRegExp: /^\/admin-tools/,
+      requiredPermission: Permission.ADMIN,
+    },
   ];
 
   const filteredLinks = menuLinks.filter(
     (link) =>
-      !link.requiredPermission ||
-      hasPermission(link.requiredPermission, {
-        type: link.permissionType ?? 'and',
-      })
+      !(link.href === '/issues' && currentSettings.issuesEnabled === false) &&
+      !(
+        link.href === '/blocklist' && currentSettings.blocklistEnabled === false
+      ) &&
+      !(link.animeOnly && user?.settings?.showAnime === false) &&
+      (!link.requiredPermission ||
+        hasPermission(link.requiredPermission, {
+          type: link.permissionType ?? 'and',
+        }))
+  );
+  const bottomLinks = filteredLinks.filter((link) =>
+    [
+      '/',
+      '/discover/movies',
+      '/discover/tv',
+      '/discover/anime',
+      '/offline',
+    ].includes(link.href)
   );
 
   useEffect(() => {
@@ -179,7 +241,7 @@ const MobileMenu = ({
         leave="transition duration-500"
         leaveFrom="opacity-100 -translate-y-full"
         leaveTo="opacity-0 translate-y-0"
-        className="absolute left-0 right-0 top-0 flex w-full -translate-y-full flex-col space-y-6 border-t border-gray-600 bg-gray-900/90 px-6 py-6 font-semibold text-gray-100 backdrop-blur"
+        className="absolute left-0 right-0 top-0 flex max-h-[min(75dvh,38rem)] w-full -translate-y-full flex-col space-y-4 overflow-y-auto border-t border-gray-600 bg-gray-900/95 px-6 py-5 font-semibold text-gray-100 backdrop-blur"
       >
         {filteredLinks.map((link) => {
           const isActive = router.pathname.match(link.activeRegExp);
@@ -226,54 +288,50 @@ const MobileMenu = ({
         })}
       </Transition>
       <div className="padding-bottom-safe border-t border-gray-600 bg-gray-800/90 backdrop-blur">
-        <div className="flex h-full items-center justify-between px-6 py-4 text-gray-100">
-          {filteredLinks
-            .slice(0, filteredLinks.length === 5 ? 5 : 4)
-            .map((link) => {
-              const isActive =
-                router.pathname.match(link.activeRegExp) && !isOpen;
-              return (
-                <Link
-                  key={`mobile-menu-link-${link.href}`}
-                  href={link.href}
-                  className={`relative flex flex-col items-center space-y-1 ${
-                    isActive ? 'text-indigo-500' : ''
-                  }`}
-                >
-                  {cloneElement(
-                    isActive ? link.svgIconSelected : link.svgIcon,
-                    {
-                      className: 'h-6 w-6',
-                    }
+        <div className="flex h-full items-center justify-around gap-1 px-2 py-3 text-gray-100">
+          {bottomLinks.map((link) => {
+            const isActive =
+              router.pathname.match(link.activeRegExp) && !isOpen;
+            return (
+              <Link
+                key={`mobile-menu-link-${link.href}`}
+                href={link.href}
+                className={`relative flex flex-col items-center space-y-1 ${
+                  isActive ? 'text-indigo-500' : ''
+                }`}
+              >
+                {cloneElement(isActive ? link.svgIconSelected : link.svgIcon, {
+                  className: 'h-6 w-6',
+                })}
+                {link.href === '/requests' &&
+                  pendingRequestsCount > 0 &&
+                  hasPermission(Permission.MANAGE_REQUESTS) && (
+                    <div className="absolute bottom-3 left-3">
+                      <Badge
+                        className={`bg-gradient-to-br ${
+                          router.pathname.match(link.activeRegExp)
+                            ? 'border-indigo-600 from-indigo-700 to-purple-700'
+                            : 'border-indigo-500 from-indigo-600 to-purple-600'
+                        } flex ${
+                          pendingRequestsCount > 99 ? 'w-6' : 'w-4'
+                        } h-4 items-center justify-center !px-[5px] !py-[7px] text-[8px]`}
+                      >
+                        {pendingRequestsCount > 99
+                          ? '99+'
+                          : pendingRequestsCount}
+                      </Badge>
+                    </div>
                   )}
-                  {link.href === '/requests' &&
-                    pendingRequestsCount > 0 &&
-                    hasPermission(Permission.MANAGE_REQUESTS) && (
-                      <div className="absolute bottom-3 left-3">
-                        <Badge
-                          className={`bg-gradient-to-br ${
-                            router.pathname.match(link.activeRegExp)
-                              ? 'border-indigo-600 from-indigo-700 to-purple-700'
-                              : 'border-indigo-500 from-indigo-600 to-purple-600'
-                          } flex ${
-                            pendingRequestsCount > 99 ? 'w-6' : 'w-4'
-                          } h-4 items-center justify-center !px-[5px] !py-[7px] text-[8px]`}
-                        >
-                          {pendingRequestsCount > 99
-                            ? '99+'
-                            : pendingRequestsCount}
-                        </Badge>
-                      </div>
-                    )}
-                </Link>
-              );
-            })}
-          {filteredLinks.length > 4 && filteredLinks.length !== 5 && (
+              </Link>
+            );
+          })}
+          {filteredLinks.length > bottomLinks.length && (
             <button
               className={`flex flex-col items-center space-y-1 ${
                 isOpen ? 'text-indigo-500' : ''
               }`}
               onClick={() => toggle()}
+              aria-label={isOpen ? 'Close navigation' : 'More navigation'}
             >
               {isOpen ? (
                 <XMarkIcon className="h-6 w-6" />

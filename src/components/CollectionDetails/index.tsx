@@ -168,7 +168,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
   let collectionStatus = MediaStatus.UNKNOWN;
   let collectionStatus4k = MediaStatus.UNKNOWN;
 
-  const blocklistedParts = data.parts.filter(
+  const blocklistedParts = settings.currentSettings.blocklistEnabled === false ? [] : data.parts.filter(
     (part) =>
       part.mediaInfo && part.mediaInfo.status === MediaStatus.BLOCKLISTED
   );
@@ -389,7 +389,8 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
           </span>
         </div>
         <div className="media-actions">
-          {hasPermission([Permission.MANAGE_BLOCKLIST], { type: 'or' }) &&
+          {settings.currentSettings.blocklistEnabled !== false &&
+            hasPermission([Permission.MANAGE_BLOCKLIST], { type: 'or' }) &&
             (isCollectionBlocklisted ? (
               <Tooltip
                 content={
@@ -488,7 +489,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
         isEmpty={data.parts.length === 0}
         items={data.parts
           .filter((title) => {
-            if (!blocklistVisibility) {
+            if (settings.currentSettings.blocklistEnabled !== false && !blocklistVisibility) {
               return title.mediaInfo?.status !== MediaStatus.BLOCKLISTED;
             }
             return title;

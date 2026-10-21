@@ -45,7 +45,7 @@ const ButtonWithDropdown = ({
     <Menu as="div" className="relative z-10 inline-flex">
       <TriggerElement
         type="button"
-        className={`relative z-10 inline-flex h-full items-center px-4 py-2 text-sm font-medium leading-5 transition duration-150 ease-in-out hover:z-20 focus:z-20 focus:outline-none ${
+        className={`relative z-10 inline-flex h-full items-center justify-center px-4 py-2 text-sm font-medium leading-5 transition duration-150 ease-in-out hover:z-20 focus:z-20 focus:outline-none ${
           styleClasses.mainButtonClasses
         } ${children ? 'rounded-l-md' : 'rounded-md'} ${className}`}
         {...(props as Record<string, string>)}

@@ -1,18 +1,23 @@
 import Badge from '@app/components/Common/Badge';
 import VersionStatus from '@app/components/Layout/VersionStatus';
 import useClickOutside from '@app/hooks/useClickOutside';
+import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition, TransitionChild } from '@headlessui/react';
 import {
+  ArrowDownTrayIcon,
   ClockIcon,
   CogIcon,
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
+  PhotoIcon,
   SparklesIcon,
+  StarIcon,
   TvIcon,
   UsersIcon,
+  WrenchScrewdriverIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
@@ -25,11 +30,16 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   dashboard: 'Discover',
   browsemovies: 'Movies',
   browsetv: 'Series',
+  browseanime: 'Anime',
   requests: 'Requests',
   blocklist: 'Blocklist',
   issues: 'Issues',
   users: 'Users',
   settings: 'Settings',
+  adminTools: 'Admin tools',
+  history: 'My Watch History',
+  offline: 'Offline library',
+  parties: 'Watch parties',
 });
 
 interface SidebarProps {
@@ -50,6 +60,7 @@ interface SidebarLinkProps {
   requiredPermission?: Permission | Permission[];
   permissionType?: 'and' | 'or';
   dataTestId?: string;
+  animeOnly?: boolean;
 }
 
 const SidebarLinks: SidebarLinkProps[] = [
@@ -72,10 +83,35 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/discover\/tv$/,
   },
   {
+    href: '/discover/anime',
+    messagesKey: 'browseanime',
+    svgIcon: <PhotoIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/discover\/anime$/,
+    animeOnly: true,
+  },
+  {
     href: '/requests',
     messagesKey: 'requests',
     svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/requests/,
+  },
+  {
+    href: '/watch-history',
+    messagesKey: 'history',
+    svgIcon: <StarIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/watch-history/,
+  },
+  {
+    href: '/parties',
+    messagesKey: 'parties',
+    svgIcon: <UsersIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/parties/,
+  },
+  {
+    href: '/offline',
+    messagesKey: 'offline',
+    svgIcon: <ArrowDownTrayIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/offline$/,
   },
   {
     href: '/blocklist',
@@ -116,6 +152,13 @@ const SidebarLinks: SidebarLinkProps[] = [
     requiredPermission: Permission.ADMIN,
     dataTestId: 'sidebar-menu-settings',
   },
+  {
+    href: '/admin-tools',
+    messagesKey: 'adminTools',
+    svgIcon: <WrenchScrewdriverIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/admin-tools/,
+    requiredPermission: Permission.ADMIN,
+  },
 ];
 
 const Sidebar = ({
@@ -129,7 +172,8 @@ const Sidebar = ({
   const navRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const intl = useIntl();
-  const { hasPermission } = useUser();
+  const { user, hasPermission } = useUser();
+  const { currentSettings } = useSettings();
   useClickOutside(navRef, () => setClosed());
 
   useEffect(() => {
@@ -198,11 +242,17 @@ const Sidebar = ({
                     </div>
                     <nav className="mt-10 flex-1 space-y-4 px-4">
                       {SidebarLinks.filter((link) =>
-                        link.requiredPermission
-                          ? hasPermission(link.requiredPermission, {
-                              type: link.permissionType ?? 'and',
-                            })
-                          : true
+                        (link.messagesKey === 'issues' &&
+                          currentSettings.issuesEnabled === false) ||
+                        (link.messagesKey === 'blocklist' &&
+                          currentSettings.blocklistEnabled === false) ||
+                        (link.animeOnly && user?.settings?.showAnime === false)
+                          ? false
+                          : link.requiredPermission
+                            ? hasPermission(link.requiredPermission, {
+                                type: link.permissionType ?? 'and',
+                              })
+                            : true
                       ).map((sidebarLink) => {
                         return (
                           <Link
@@ -266,11 +316,17 @@ const Sidebar = ({
               </div>
               <nav className="mt-8 flex-1 space-y-4 px-4">
                 {SidebarLinks.filter((link) =>
-                  link.requiredPermission
-                    ? hasPermission(link.requiredPermission, {
-                        type: link.permissionType ?? 'and',
-                      })
-                    : true
+                  (link.messagesKey === 'issues' &&
+                    currentSettings.issuesEnabled === false) ||
+                  (link.messagesKey === 'blocklist' &&
+                    currentSettings.blocklistEnabled === false) ||
+                  (link.animeOnly && user?.settings?.showAnime === false)
+                    ? false
+                    : link.requiredPermission
+                      ? hasPermission(link.requiredPermission, {
+                          type: link.permissionType ?? 'and',
+                        })
+                      : true
                 ).map((sidebarLink) => {
                   return (
                     <Link

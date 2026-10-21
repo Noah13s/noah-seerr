@@ -10,10 +10,8 @@ import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import {
-  getRequestDownloadStatus,
-  refreshIntervalHelper,
-} from '@app/utils/refreshIntervalHelper';
+import { getRequestDownloadStatus } from '@app/utils/refreshIntervalHelper';
+import { getNextMovieRelease, getNextTvRelease } from '@app/utils/releaseDates';
 import { withProperties } from '@app/utils/typeHelpers';
 import {
   ArrowPathIcon,
@@ -90,6 +88,11 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
   const deleteRequest = async () => {
     await axios.delete(`/api/v1/media/${requestData?.media.id}`);
     mutate('/api/v1/media?filter=allavailable&take=20&sort=mediaAdded');
+    mutate(
+      (key) =>
+        Array.isArray(key) &&
+        key[0] === '/api/v1/media?filter=allavailable&take=20&sort=mediaAdded'
+    );
     mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
     mutate('/api/v1/request/count');
   };
@@ -245,13 +248,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     `/api/v1/request/${request.id}`,
     {
       fallbackData: request,
-      refreshInterval: refreshIntervalHelper(
-        {
-          downloadStatus: request.media.downloadStatus,
-          downloadStatus4k: request.media.downloadStatus4k,
-        },
-        15000
-      ),
+      refreshInterval: 15000,
+      revalidateOnFocus: true,
     }
   );
 
@@ -325,6 +323,13 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     return <RequestCardError requestData={requestData} />;
   }
 
+  const upcomingRelease = isMovie(title)
+    ? getNextMovieRelease(
+        title.releases,
+        user?.settings?.discoverRegion ?? 'US',
+        title.releaseDate
+      )
+    : getNextTvRelease(title.nextEpisodeToAir?.airDate, title.firstAirDate);
   const requestDownloadStatus = getRequestDownloadStatus(
     requestData.media[requestData.is4k ? 'downloadStatus4k' : 'downloadStatus'],
     requestData.type === 'tv'
@@ -474,6 +479,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                     ? requestData.media.serviceUrl4k
                     : requestData.media.serviceUrl
                 }
+                upcomingRelease={upcomingRelease}
               />
             )}
           </div>

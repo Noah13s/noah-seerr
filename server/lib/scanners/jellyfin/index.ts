@@ -1,4 +1,5 @@
 import animeList from '@server/api/animelist';
+import { hasApprovedLibraryDeletion, deletedSourceIsPresent, jellyfinSourcePaths } from '@server/lib/deletedSourceGuard';
 import type {
   JellyfinLibraryItem,
   JellyfinLibraryItemExtended,
@@ -13,7 +14,9 @@ import type {
   TmdbTvScanDetails,
 } from '@server/api/themoviedb/interfaces';
 import { MediaServerType } from '@server/constants/server';
+import { MediaStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
 import type {
   ProcessableSeason,
@@ -24,6 +27,8 @@ import BaseScanner from '@server/lib/scanners/baseScanner';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { getHostname } from '@server/utils/getHostname';
+import { MissingLibraryLinkRecovery } from '@server/lib/missingLibraryLinks';
+import axios from 'axios';
 import { uniqWith } from 'lodash';
 
 interface JellyfinSyncStatus extends StatusBase {
@@ -40,6 +45,7 @@ class JellyfinScanner
   private currentLibrary: Library;
   private isRecentOnly = false;
   private processedAnidbSeason: Map<number, Map<number, number>>;
+  private missingLinks = new MissingLibraryLinkRecovery();
 
   constructor({ isRecentOnly }: { isRecentOnly?: boolean } = {}) {
     super('Jellyfin Sync');
@@ -126,6 +132,8 @@ class JellyfinScanner
       if (!extracted) return;
 
       const { tmdbId, imdbId, metadata } = extracted;
+      if (await hasApprovedLibraryDeletion(tmdbId, 'movie') &&
+          !await deletedSourceIsPresent(jellyfinSourcePaths(metadata))) return;
 
       const has4k = metadata.MediaSources?.some((MediaSource) => {
         return MediaSource.MediaStreams.filter(
@@ -309,6 +317,12 @@ class JellyfinScanner
           if (matchedJellyfinSeason) {
             let totalStandard = 0;
             let total4k = 0;
+            const deletedSeason = await hasApprovedLibraryDeletion(tvShow.id, 'tv', season.season_number);
+            const sourceExists = async (episode: JellyfinLibraryItem) => {
+              if (!deletedSeason) return true;
+              const item = await this.jfClient.getItemData(episode.Id);
+              return !!item && deletedSourceIsPresent(jellyfinSourcePaths(item));
+            };
 
             if (!this.enable4kShow) {
               const episodes = await this.jfClient.getEpisodes(
@@ -317,6 +331,7 @@ class JellyfinScanner
               );
 
               for (const episode of episodes) {
+                if (!await sourceExists(episode)) continue;
                 let episodeCount = 1;
 
                 // count number of combined episodes
@@ -339,6 +354,7 @@ class JellyfinScanner
               );
 
               for (const episode of episodes) {
+                if (!await sourceExists(episode)) continue;
                 let episodeCount = 1;
 
                 // count number of combined episodes
@@ -490,6 +506,11 @@ class JellyfinScanner
       await animeList.sync();
 
       if (this.isRecentOnly) {
+        const missingLinks = await getRepository(Media).createQueryBuilder('media')
+          .select(['media.tmdbId', 'media.mediaType'])
+          .where('(media.status IN (:...available) AND media.jellyfinMediaId IS NULL) OR (media.status4k IN (:...available) AND media.jellyfinMediaId4k IS NULL)', {
+            available: [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE],
+          }).getMany();
         for (const library of this.libraries) {
           this.currentLibrary = library;
           // Reset AniDB season tracking per library
@@ -499,6 +520,27 @@ class JellyfinScanner
             'info'
           );
           const libraryItems = await this.jfClient.getRecentlyAdded(library.id);
+          try {
+            const recovered = await this.missingLinks.find(library.id, missingLinks,
+              async (start, limit) => (await axios.get(`${getHostname()}/Items`, {
+                headers: { Authorization: `MediaBrowser Token="${settings.jellyfin.apiKey}"` },
+                params: {
+                  ParentId: library.id, userId: admin.jellyfinUserId,
+                  IncludeItemTypes: 'Movie,Series', Recursive: true,
+                  SortBy: 'SortName,Id', SortOrder: 'Ascending',
+                  Fields: 'ProviderIds', EnableUserData: false,
+                  StartIndex: start, Limit: limit, EnableTotalRecordCount: true,
+                },
+                timeout: 10000, maxRedirects: 0,
+              })).data);
+            libraryItems.push(...recovered);
+            if (recovered.length) this.log('Recovering missing playback links', 'info', {
+              library: library.name, count: recovered.length,
+            });
+          } catch {
+            // Recovery must not prevent normal recent imports from syncing.
+            this.log('Playback-link recovery will retry on the next scan', 'warn');
+          }
 
           // Bundle items up by rating keys
           this.items = uniqWith(libraryItems, (mediaA, mediaB) => {

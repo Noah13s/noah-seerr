@@ -129,6 +129,11 @@ components:
           type: string
           example: '2020-09-02T05:02:23.000Z'
           readOnly: true
+        lastActiveAt:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
         requestCount:
           type: number
           example: 5
@@ -164,6 +169,10 @@ components:
           type: string
           nullable: true
           example: 'en'
+        showAnime:
+          type: boolean
+          description: 'Show the Anime section for this profile'
+          example: true
         movieQuotaLimit:
           type: number
           nullable: true
@@ -2145,6 +2154,73 @@ components:
             - certification: 'PG'
               meaning: 'Some material may not be suitable for children under 10.'
               order: 2
+    WatchHistoryInput:
+      type: object
+      required:
+        - mediaType
+        - title
+      properties:
+        mediaType:
+          type: string
+          enum: [movie, tv]
+        tmdbId:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        releaseYear:
+          type: integer
+          nullable: true
+          minimum: 1870
+          maximum: 2200
+        status:
+          type: string
+          enum: [planned, watching, completed, dropped]
+        watchCount:
+          type: integer
+          minimum: 0
+        watchedAt:
+          type: string
+          format: date-time
+          nullable: true
+        watchedEpisodes:
+          type: integer
+          nullable: true
+          minimum: 0
+        totalEpisodes:
+          type: integer
+          nullable: true
+          minimum: 0
+        seasonProgress:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        episodeOverrides:
+          type: object
+          additionalProperties:
+            type: boolean
+        categories:
+          type: string
+          nullable: true
+        rating:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 5
+        priority:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 10
+        series:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -2156,6 +2232,105 @@ components:
       name: X-Api-Key
 
 paths:
+  /admin-tools/authorize:
+    get:
+      summary: Authorize access to administrative service proxies
+      tags:
+        - settings
+      responses:
+        '204':
+          description: Administrator authorized
+  /admin-tools/insights:
+    get:
+      summary: Get administrator watch, disk, and cleanup preview insights
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Administrator insights and review-only cleanup candidates
+  /admin-tools/cleanup:
+    get:
+      summary: List media deletion approvals (administrators only)
+      tags: [settings]
+      responses:
+        '200':
+          description: Pending, kept, and completed cleanup reviews
+  /admin-tools/cleanup/override-preview:
+    post:
+      summary: Preview an administrator override without deleting any file
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [mediaType, tmdbId]
+              properties:
+                mediaType:
+                  type: string
+                  enum: [movie, tv]
+                tmdbId:
+                  type: integer
+                  minimum: 1
+                seasonNumber:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Exact library files and administrator-bound override confirmation
+  /admin-tools/cleanup/{id}/preview:
+    get:
+      summary: Review a deletion or keep decision without deleting files
+      tags: [settings]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: intent
+          required: true
+          schema:
+            type: string
+            enum: [delete, keep, reconsider]
+      responses:
+        '200':
+          description: Fresh preview and administrator-bound confirmation token
+  /admin-tools/cleanup/{id}/decision:
+    post:
+      summary: Confirm an administrator's media cleanup decision
+      tags: [settings]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action, token]
+              properties:
+                action:
+                  type: string
+                  enum: [delete, delete-now, keep, reconsider]
+                token:
+                  type: string
+                  maxLength: 80
+      responses:
+        '200':
+          description: Decision saved or approved library files deleted
+        '409':
+          description: Review expired, changed, or media is in use
   /status:
     get:
       summary: Get Seerr status
@@ -4029,6 +4204,90 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+  /auth/cast-diagnostics:
+    post:
+      summary: Record administrator Cast test diagnostics
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '204':
+          description: Diagnostic accepted
+        '400':
+          description: Invalid diagnostic
+        '403':
+          description: Administrator required
+        '429':
+          description: Diagnostic rate limit exceeded
+  /auth/jellyfin-session:
+    get:
+      summary: Prepare the current user's Jellyfin playback session
+      description: Returns the authenticated user's Jellyfin connection details for the embedded player. Local users are provisioned with a dedicated non-administrator Jellyfin profile when necessary.
+      tags:
+        - auth
+      responses:
+        '200':
+          description: Jellyfin connection details for the current user
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - serverId
+                  - serverName
+                  - userId
+                  - accessToken
+                properties:
+                  serverId:
+                    type: string
+                  serverName:
+                    type: string
+                  userId:
+                    type: string
+                  accessToken:
+                    type: string
+        '409':
+          description: The existing Jellyfin account must be linked again
+  /auth/jellyfin-warm:
+    post:
+      summary: Prepare the selected media disk and GPU for playback
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [itemId]
+              properties:
+                itemId:
+                  type: string
+                  pattern: '^[a-fA-F0-9]{32}$'
+      responses:
+        '204':
+          description: Preparation attempted; normal playback remains available
+        '400':
+          description: Invalid item
+        '401':
+          description: Authentication required
+        '409':
+          description: Jellyfin account must be linked
+  /auth/activity:
+    post:
+      summary: Record visible activity for the signed-in user
+      tags:
+        - auth
+      responses:
+        '204':
+          description: Activity recorded or recently recorded
   /auth/plex:
     post:
       summary: Sign in using a Plex token
@@ -4300,7 +4559,16 @@ paths:
           name: sort
           schema:
             type: string
-            enum: [created, updated, requests, displayname, usertype, role]
+            enum:
+              [
+                created,
+                updated,
+                lastactive,
+                requests,
+                displayname,
+                usertype,
+                role,
+              ]
             default: created
         - in: query
           name: sortDirection
@@ -5628,6 +5896,12 @@ paths:
         - search
       parameters:
         - in: query
+          name: anime
+          description: Return anime titles only when set to `only`
+          schema:
+            type: string
+            enum: [only]
+        - in: query
           name: page
           schema:
             type: number
@@ -5953,6 +6227,12 @@ paths:
       tags:
         - search
       parameters:
+        - in: query
+          name: anime
+          description: Return anime titles only when set to `only`
+          schema:
+            type: string
+            enum: [only]
         - in: query
           name: page
           schema:
@@ -6445,6 +6725,34 @@ paths:
                     name:
                       type: string
                       example: Genre Name
+  /discover/personal-recommendations:
+    get:
+      summary: Get recommendations for the signed-in profile
+      description: Uses that profile's ratings, watch history and watchlist.
+      tags:
+        - search
+      parameters:
+        - in: query
+          name: profile
+          schema:
+            type: integer
+          description: Client cache key; recommendations always use the authenticated profile.
+      responses:
+        '200':
+          description: Personal recommendations returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasProfileSignals:
+                    type: boolean
+                  results:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/MovieResult'
+                        - $ref: '#/components/schemas/TvResult'
   /discover/watchlist:
     get:
       summary: Get the Plex watchlist.
@@ -6457,6 +6765,13 @@ paths:
             type: number
             example: 1
             default: 1
+        - in: query
+          name: take
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 20
       responses:
         '200':
           description: Watchlist data returned
@@ -6658,6 +6973,14 @@ paths:
                     type: number
                   completed:
                     type: number
+  /request/activity:
+    get:
+      summary: Get live status of the authenticated user's recent requests
+      tags:
+        - request
+      responses:
+        '200':
+          description: Recent request activity returned
   /request/{requestId}:
     get:
       summary: Get MediaRequest
@@ -7079,6 +7402,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Season'
+  /tv/{tvId}/playback-item/{itemId}:
+    get:
+      summary: Resolve a Jellyfin playback item to a series episode
+      tags:
+        - tv
+      parameters:
+        - in: path
+          name: tvId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Season and episode numbers returned
+  /tv/{tvId}/season/{seasonNumber}/playback:
+    get:
+      summary: Get playable Jellyfin episodes for a season
+      tags:
+        - tv
+      parameters:
+        - in: path
+          name: tvId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: seasonNumber
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Jellyfin playback URLs by episode number
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  episodes:
+                    type: object
+                    additionalProperties:
+                      type: string
   /tv/{tvId}/recommendations:
     get:
       summary: Get recommended TV series
@@ -7306,6 +7676,7 @@ paths:
             type: string
             enum: [added, modified, mediaAdded]
             default: added
+          description: The mediaAdded sort returns only media requested by the authenticated user.
       responses:
         '200':
           description: Returned media
@@ -7320,6 +7691,62 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/MediaInfo'
+  /media/{mediaType}/{tmdbId}/technical:
+    get:
+      summary: Get available file quality and languages
+      description: Returns video resolution and English/French audio and subtitle availability from Jellyfin media streams.
+      tags:
+        - media
+      parameters:
+        - in: path
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv]
+        - in: path
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Technical details for available files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fileCount:
+                    type: integer
+                  qualities:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        resolution:
+                          type: integer
+                          nullable: true
+                        count:
+                          type: integer
+                  audio:
+                    type: object
+                    properties:
+                      en:
+                        type: integer
+                      fr:
+                        type: integer
+                      unknown:
+                        type: integer
+                  subtitles:
+                    type: object
+                    properties:
+                      en:
+                        type: integer
+                      fr:
+                        type: integer
+        '404':
+          description: No available Jellyfin file for this title
   /media/{mediaId}:
     delete:
       summary: Delete media item
@@ -8170,6 +8597,252 @@ paths:
                   message:
                     type: string
                     example: Unable to retrieve TV certifications.
+  /watch-history:
+    get:
+      summary: Get the authenticated user's personal watch history
+      tags:
+        - users
+      parameters:
+        - in: query
+          name: active
+          description: Include unfinished rewatches while preserving completed status
+          schema:
+            type: string
+            enum: ['1']
+        - in: query
+          name: profile
+          description: Client cache partition; results always use the authenticated user
+          schema:
+            type: integer
+        - in: query
+          name: take
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - in: query
+          name: skip
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [planned, watching, completed, dropped]
+        - in: query
+          name: mediaType
+          schema:
+            type: string
+            enum: [movie, tv]
+      responses:
+        '200':
+          description: Personal watch history returned
+    post:
+      summary: Add an item to the authenticated user's personal watch history
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchHistoryInput'
+      responses:
+        '201':
+          description: Watch history item created
+  /watch-history/playback:
+    post:
+      summary: Save current viewing progress without replacing lifetime history
+      tags: [watch-history]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Personal viewing progress saved
+        '400':
+          description: Invalid progress or episode identity
+  /watch-history/{id}/rewatch:
+    delete:
+      summary: Stop an unfinished rewatch while preserving watched history
+      tags: [watch-history]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Rewatch stopped without adding a completion
+        '404':
+          description: Personal history entry not found
+  /watch-history/{id}/rating:
+    patch:
+      summary: Update a rating without overwriting concurrent playback progress
+      tags: [watch-history]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+      responses:
+        '200':
+          description: Rating saved
+        '404':
+          description: Personal history entry not found
+  /watch-history/episode:
+    put:
+      summary: Mark one episode watched or not watched
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tmdbId, title, seasonNumber, episodeNumber, watched]
+              properties:
+                tmdbId:
+                  type: integer
+                title:
+                  type: string
+                seasonNumber:
+                  type: integer
+                episodeNumber:
+                  type: integer
+                watched:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated watch history item
+        '204':
+          description: No watch history item to update
+  /watch-history/summary:
+    get:
+      summary: Get the authenticated user's watch status by TMDB identifier
+      tags:
+        - users
+      responses:
+        '200':
+          description: Personal watch status map returned
+  /watch-history/public-ratings:
+    get:
+      summary: Get TMDB ratings for the authenticated user's watch history
+      tags:
+        - users
+      parameters:
+        - in: query
+          name: profile
+          description: Client cache partition; results always use the authenticated user
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: TMDB average and vote count by media type and identifier
+  /watch-history/planned-metadata:
+    get:
+      summary: Get TMDB ratings and release dates for the authenticated user's watchlist
+      tags:
+        - users
+      responses:
+        '200':
+          description: TMDB ratings and release dates by media type and identifier
+  /watch-history/{id}:
+    put:
+      summary: Update a personal watch history item
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchHistoryInput'
+      responses:
+        '200':
+          description: Watch history item updated
+    delete:
+      summary: Delete a personal watch history item
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Watch history item deleted
+  /upgrade/{mediaType}/{tmdbId}:
+    parameters:
+      - in: path
+        name: mediaType
+        required: true
+        schema:
+          type: string
+          enum: [movie, tv]
+      - in: path
+        name: tmdbId
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      summary: Find an admissible 2160p media upgrade
+      tags:
+        - media
+      responses:
+        '200':
+          description: Current quality and best upgrade plan
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Media not found in the library or Arr service
+    post:
+      summary: Send the best 2160p media upgrade to Radarr or Sonarr
+      tags:
+        - media
+      responses:
+        '202':
+          description: Upgrade releases accepted by Radarr or Sonarr
+          content:
+            application/json:
+              schema:
+                type: object
+        '409':
+          description: No admissible upgrade is currently available
   /overrideRule:
     get:
       summary: Get override rules

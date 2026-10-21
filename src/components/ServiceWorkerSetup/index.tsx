@@ -12,12 +12,13 @@ const ServiceWorkerSetup = () => {
   useEffect(() => {
     if ('serviceWorker' in navigator && user?.id) {
       navigator.serviceWorker
-        .register('/sw.js')
+        .register('/sw.js', { updateViaCache: 'none' })
         .then(async (registration) => {
           console.log(
             '[SW] Registration successful, scope is:',
             registration.scope
           );
+          await registration.update();
 
           const pushNotificationsEnabled =
             localStorage.getItem('pushNotificationsEnabled') === 'true';

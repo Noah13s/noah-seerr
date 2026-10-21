@@ -55,6 +55,10 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   hideBlocklisted: 'Hide Blocklisted Items',
   hideBlocklistedTip:
     'Hide blocklisted items from discover pages for all users with the "Manage Blocklist" permission',
+  issuesEnabled: 'Enable issue reporting',
+  issuesEnabledTip: 'Show issue reporting and allow users to submit and manage issues.',
+  blocklistEnabled: 'Enable blocklist',
+  blocklistEnabledTip: 'Show and enforce the blocklist across the app.',
   toastApiKeySuccess: 'New API key generated successfully!',
   toastApiKeyFailure: 'Something went wrong while generating a new API key.',
   toastSettingsSuccess: 'Settings saved successfully!',
@@ -176,6 +180,8 @@ const SettingsMain = () => {
             applicationUrl: data?.applicationUrl,
             hideAvailable: data?.hideAvailable,
             hideBlocklisted: data?.hideBlocklisted,
+            issuesEnabled: data?.issuesEnabled ?? true,
+            blocklistEnabled: data?.blocklistEnabled ?? true,
             hideRequested: data?.hideRequested,
             locale: data?.locale ?? 'en',
             discoverRegion: data?.discoverRegion,
@@ -200,6 +206,8 @@ const SettingsMain = () => {
                 applicationUrl: values.applicationUrl,
                 hideAvailable: values.hideAvailable,
                 hideBlocklisted: values.hideBlocklisted,
+                issuesEnabled: values.issuesEnabled,
+                blocklistEnabled: values.blocklistEnabled,
                 hideRequested: values.hideRequested,
                 locale: values.locale,
                 discoverRegion: values.discoverRegion,
@@ -524,6 +532,30 @@ const SettingsMain = () => {
                     />
                   </div>
                 </div>
+                {(['issuesEnabled', 'blocklistEnabled'] as const).map((name) => (
+                  <div className="form-row" key={name}>
+                    <label htmlFor={name} className="checkbox-label">
+                      <span className="mr-2">
+                        {intl.formatMessage(messages[name])}
+                      </span>
+                      <span className="label-tip">
+                        {intl.formatMessage(
+                          name === 'issuesEnabled'
+                            ? messages.issuesEnabledTip
+                            : messages.blocklistEnabledTip
+                        )}
+                      </span>
+                    </label>
+                    <div className="form-input-area">
+                      <Field
+                        type="checkbox"
+                        id={name}
+                        name={name}
+                        onChange={() => setFieldValue(name, !values[name])}
+                      />
+                    </div>
+                  </div>
+                ))}
                 <div className="form-row">
                   <label htmlFor="hideBlocklisted" className="checkbox-label">
                     <span className="mr-2">

@@ -13,6 +13,7 @@ import {
 import {
   ArrowRightOnRectangleIcon,
   ClockIcon,
+  QrCodeIcon,
 } from '@heroicons/react/24/outline';
 import { CogIcon, UserIcon } from '@heroicons/react/24/solid';
 import axios from 'axios';
@@ -144,6 +145,18 @@ const UserDropdown = () => {
               {user && <MiniQuotaDisplay userId={user?.id} />}
             </div>
             <div className="p-1">
+              <Menu.Item>
+                {({ active }) => (
+                  <ForwardedLink
+                    href="/pair-device"
+                    data-testid="user-menu-pair-device"
+                    className={`flex items-center rounded px-4 py-2 text-sm font-medium text-gray-200 ${active ? 'bg-indigo-600 text-white' : ''}`}
+                  >
+                    <QrCodeIcon className="mr-2 h-5 w-5" />
+                    <span>Pair a device</span>
+                  </ForwardedLink>
+                )}
+              </Menu.Item>
               <MenuItem>
                 {({ active }) => (
                   <ForwardedLink

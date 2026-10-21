@@ -84,7 +84,8 @@ const RequestList = () => {
         : router.query.userId
           ? `&requestedBy=${router.query.userId}`
           : ''
-    }`
+    }`,
+    { refreshInterval: 15000, revalidateOnFocus: true }
   );
 
   // Restore last set filter values on component mount

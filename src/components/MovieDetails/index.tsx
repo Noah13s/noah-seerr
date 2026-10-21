@@ -18,20 +18,25 @@ import ExternalLinkBlock from '@app/components/ExternalLinkBlock';
 import IssueModal from '@app/components/IssueModal';
 import ManageSlideOver from '@app/components/ManageSlideOver';
 import MediaSlider from '@app/components/MediaSlider';
+import MediaTechnicalDetails from '@app/components/MediaTechnicalDetails';
+import MediaUpgrade from '@app/components/MediaUpgrade';
 import PersonCard from '@app/components/PersonCard';
 import RequestButton from '@app/components/RequestButton';
 import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
+import MediaWatchEditor from '@app/components/WatchHistory/MediaWatchEditor';
+import WatchStatusBadge from '@app/components/WatchHistory/WatchStatusBadge';
 import useDeepLinks from '@app/hooks/useDeepLinks';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import useWatchHistoryStatus from '@app/hooks/useWatchHistoryStatus';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
-import { refreshIntervalHelper } from '@app/utils/refreshIntervalHelper';
+import { getNextMovieRelease } from '@app/utils/releaseDates';
 import {
   ArrowRightCircleIcon,
   CloudIcon,
@@ -130,6 +135,10 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     useState<boolean>(false);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
   const { addToast } = useToasts();
+  const watchHistoryEntry = useWatchHistoryStatus(
+    Number(router.query.movieId),
+    'movie'
+  );
 
   const {
     data,
@@ -137,13 +146,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     mutate: revalidate,
   } = useSWR<MovieDetailsType>(`/api/v1/movie/${router.query.movieId}`, {
     fallbackData: movie,
-    refreshInterval: refreshIntervalHelper(
-      {
-        downloadStatus: movie?.mediaInfo?.downloadStatus,
-        downloadStatus4k: movie?.mediaInfo?.downloadStatus4k,
-      },
-      15000
-    ),
+    refreshInterval: 15000,
+    revalidateOnFocus: true,
   });
 
   const { data: ratingData } = useSWR<RatingResponse>(
@@ -198,6 +202,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       text: getAvailableMediaServerName(),
       url: plexUrl,
       svg: <PlayIcon />,
+      watchProgress: { tmdbId: data.id, mediaType: 'movie', title: data.title },
     });
   }
 
@@ -212,6 +217,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       text: getAvailable4kMediaServerName(),
       url: plexUrl4k,
       svg: <PlayIcon />,
+      watchProgress: { tmdbId: data.id, mediaType: 'movie', title: data.title },
     });
   }
 
@@ -242,6 +248,11 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   const releases = data.releases.results.find(
     (r) => r.iso_3166_1 === discoverRegion
   )?.release_dates;
+  const upcomingRelease = getNextMovieRelease(
+    data.releases,
+    discoverRegion,
+    data.releaseDate
+  );
 
   // Release date types:
   // 1. Premiere
@@ -431,9 +442,11 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     closeBlocklistModal();
   };
 
-  const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
-    type: 'or',
-  });
+  const showHideButton =
+    settings.currentSettings.blocklistEnabled !== false &&
+    hasPermission([Permission.MANAGE_BLOCKLIST], {
+      type: 'or',
+    });
 
   return (
     <div
@@ -517,6 +530,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
               mediaType="movie"
               plexUrl={plexUrl}
               serviceUrl={data.mediaInfo?.serviceUrl}
+              upcomingRelease={upcomingRelease}
             />
             {settings.currentSettings.movie4kEnabled &&
               hasPermission(
@@ -541,8 +555,12 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                   mediaType="movie"
                   plexUrl={plexUrl4k}
                   serviceUrl={data.mediaInfo?.serviceUrl4k}
+                  upcomingRelease={upcomingRelease}
                 />
               )}
+            {watchHistoryEntry && (
+              <WatchStatusBadge entry={watchHistoryEntry} />
+            )}
           </div>
           <h1 data-testid="media-title">
             {data.title}{' '}
@@ -566,6 +584,21 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
           </span>
         </div>
         <div className="media-actions">
+          <MediaWatchEditor
+            tmdbId={data.id}
+            mediaType="movie"
+            title={data.title}
+            releaseYear={
+              data.releaseDate
+                ? Number(data.releaseDate.slice(0, 4))
+                : undefined
+            }
+          />
+          {data.mediaInfo &&
+            data.mediaInfo.status === MediaStatus.AVAILABLE &&
+            hasPermission(Permission.MANAGE_REQUESTS) && (
+              <MediaUpgrade tmdbId={data.id} mediaType={MediaType.MOVIE} />
+            )}
           {showHideButton &&
             data?.mediaInfo?.status !== MediaStatus.PROCESSING &&
             data?.mediaInfo?.status !== MediaStatus.AVAILABLE &&
@@ -577,7 +610,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
               >
                 <Button
                   buttonType={'ghost'}
-                  className="z-40 mr-2"
+                  className="media-action media-action-square z-40"
                   buttonSize={'md'}
                   onClick={() => setShowBlocklistModal(true)}
                 >
@@ -585,7 +618,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                 </Button>
               </Tooltip>
             )}
-          {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
+          {(settings.currentSettings.blocklistEnabled === false ||
+            data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED) &&
             user?.userType !== UserType.PLEX && (
               <>
                 {toggleWatchlist ? (
@@ -594,7 +628,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                   >
                     <Button
                       buttonType={'ghost'}
-                      className="z-40 mr-2"
+                      className="media-action media-action-square z-40"
                       buttonSize={'md'}
                       onClick={onClickWatchlistBtn}
                     >
@@ -610,7 +644,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                     content={intl.formatMessage(messages.removefromwatchlist)}
                   >
                     <Button
-                      className="z-40 mr-2"
+                      className="media-action media-action-square z-40"
                       buttonSize={'md'}
                       onClick={onClickDeleteWatchlistBtn}
                     >
@@ -621,7 +655,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
               </>
             )}
           <div className="z-20">
-            <PlayButton links={mediaLinks} />
+            <PlayButton links={mediaLinks} prepareOnPage />
           </div>
           <RequestButton
             mediaType="movie"
@@ -629,15 +663,16 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             tmdbId={data.id}
             onUpdate={() => revalidate()}
           />
-          {(data.mediaInfo?.status === MediaStatus.AVAILABLE ||
-            (settings.currentSettings.movie4kEnabled &&
-              hasPermission(
-                [Permission.REQUEST_4K, Permission.REQUEST_4K_MOVIE],
-                {
-                  type: 'or',
-                }
-              ) &&
-              data.mediaInfo?.status4k === MediaStatus.AVAILABLE)) &&
+          {settings.currentSettings.issuesEnabled !== false &&
+            (data.mediaInfo?.status === MediaStatus.AVAILABLE ||
+              (settings.currentSettings.movie4kEnabled &&
+                hasPermission(
+                  [Permission.REQUEST_4K, Permission.REQUEST_4K_MOVIE],
+                  {
+                    type: 'or',
+                  }
+                ) &&
+                data.mediaInfo?.status4k === MediaStatus.AVAILABLE)) &&
             hasPermission(
               [Permission.CREATE_ISSUES, Permission.MANAGE_ISSUES],
               {
@@ -648,7 +683,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                 <Button
                   buttonType="warning"
                   onClick={() => setShowIssueModal(true)}
-                  className="ml-2 first:ml-0"
+                  className="media-action media-action-square"
                 >
                   <ExclamationTriangleIcon />
                 </Button>
@@ -664,7 +699,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                 <Button
                   buttonType="ghost"
                   onClick={() => setShowManager(true)}
-                  className="relative ml-2 first:ml-0"
+                  className="media-action media-action-square relative"
                 >
                   <CogIcon className="!mr-0" />
                   {hasPermission(
@@ -688,6 +723,13 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             )}
         </div>
       </div>
+      <MediaTechnicalDetails
+        mediaType="movie"
+        tmdbId={data.id}
+        available={Boolean(
+          data.mediaInfo?.jellyfinMediaId || data.mediaInfo?.jellyfinMediaId4k
+        )}
+      />
       <div className="media-overview">
         <div className="media-overview-left">
           {data.tagline && <div className="tagline">{data.tagline}</div>}

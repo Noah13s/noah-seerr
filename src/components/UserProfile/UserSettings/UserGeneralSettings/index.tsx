@@ -5,6 +5,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import LanguageSelector from '@app/components/LanguageSelector';
 import QuotaSelector from '@app/components/QuotaSelector';
 import RegionSelector from '@app/components/RegionSelector';
+import AvatarPicker from '@app/components/UserProfile/UserSettings/UserGeneralSettings/AvatarPicker';
 import { availableLanguages } from '@app/context/LanguageContext';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
@@ -32,6 +33,8 @@ const messages = defineMessages(
     general: 'General',
     generalsettings: 'General Settings',
     displayName: 'Display Name',
+    profilePicture: 'Profile picture',
+    profilePictureTip: 'Choose an image for this Seerr profile',
     email: 'Email',
     save: 'Save Changes',
     saving: 'Saving…',
@@ -54,6 +57,8 @@ const messages = defineMessages(
     discoverRegionTip: 'Filter content by regional availability',
     originallanguage: 'Discover Language',
     originallanguageTip: 'Filter content by original language',
+    showAnime: 'Show Anime',
+    showAnimeTip: 'Show a separate Anime section with movies and series.',
     streamingRegion: 'Streaming Region',
     streamingRegionTip: 'Show streaming sites by regional availability',
     movierequestlimit: 'Movie Request Limit',
@@ -86,7 +91,11 @@ const UserGeneralSettings = () => {
   } = useUser({
     id: Number(router.query.userId),
   });
-  const { user: currentUser, hasPermission: currentHasPermission } = useUser();
+  const {
+    user: currentUser,
+    hasPermission: currentHasPermission,
+    revalidate: revalidateCurrentUser,
+  } = useUser();
   const { currentSettings } = useSettings();
   const {
     data,
@@ -151,10 +160,12 @@ const UserGeneralSettings = () => {
         initialValues={{
           displayName: data?.username !== user?.email ? data?.username : '',
           email: data?.email?.includes('@') ? data.email : '',
+          avatar: data?.avatar ?? user?.avatar ?? '',
           locale: data?.locale,
           discoverRegion: data?.discoverRegion,
           streamingRegion: data?.streamingRegion,
           originalLanguage: data?.originalLanguage,
+          showAnime: data?.showAnime ?? true,
           movieQuotaLimit: data?.movieQuotaLimit,
           movieQuotaDays: data?.movieQuotaDays,
           tvQuotaLimit: data?.tvQuotaLimit,
@@ -168,12 +179,14 @@ const UserGeneralSettings = () => {
           try {
             await axios.post(`/api/v1/user/${user?.id}/settings/main`, {
               username: values.displayName,
+              avatar: values.avatar,
               email:
                 values.email || user?.jellyfinUsername || user?.plexUsername,
               locale: values.locale,
               discoverRegion: values.discoverRegion,
               streamingRegion: values.streamingRegion,
               originalLanguage: values.originalLanguage,
+              showAnime: values.showAnime,
               movieQuotaLimit: movieQuotaEnabled
                 ? values.movieQuotaLimit
                 : null,
@@ -224,6 +237,9 @@ const UserGeneralSettings = () => {
           } finally {
             revalidate();
             revalidateUser();
+            if (currentUser?.id === user?.id) {
+              revalidateCurrentUser();
+            }
           }
         }}
       >
@@ -279,6 +295,20 @@ const UserGeneralSettings = () => {
                         ? intl.formatMessage(messages.admin)
                         : intl.formatMessage(messages.user)}
                   </div>
+                </div>
+              </div>
+              <div className="form-row">
+                <label className="text-label">
+                  <span>{intl.formatMessage(messages.profilePicture)}</span>
+                  <span className="label-tip">
+                    {intl.formatMessage(messages.profilePictureTip)}
+                  </span>
+                </label>
+                <div className="form-input-area max-w-3xl">
+                  <AvatarPicker
+                    value={values.avatar}
+                    onChange={(avatar) => setFieldValue('avatar', avatar)}
+                  />
                 </div>
               </div>
               <div className="form-row">
@@ -396,6 +426,17 @@ const UserGeneralSettings = () => {
                       isUserSettings
                     />
                   </div>
+                </div>
+              </div>
+              <div className="form-row">
+                <label htmlFor="showAnime" className="checkbox-label">
+                  <span>{intl.formatMessage(messages.showAnime)}</span>
+                  <span className="label-tip">
+                    {intl.formatMessage(messages.showAnimeTip)}
+                  </span>
+                </label>
+                <div className="form-input-area">
+                  <Field type="checkbox" id="showAnime" name="showAnime" />
                 </div>
               </div>
               <div className="form-row">

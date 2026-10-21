@@ -21,6 +21,7 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.DiscoverTv', {
   discovertv: 'Series',
+  animetv: 'Anime Series',
   activefilters:
     '{count, plural, one {# Active Filter} other {# Active Filters}}',
   sortPopularityAsc: 'Popularity Ascending',
@@ -44,7 +45,7 @@ const SortOptions: Record<string, TMDBSortOptions> = {
   TitleDesc: 'original_name.desc',
 } as const;
 
-const DiscoverTv = () => {
+const DiscoverTv = ({ anime = false }: { anime?: boolean }) => {
   const intl = useIntl();
   const router = useRouter();
   const [showFilters, setShowFilters] = useState(false);
@@ -59,15 +60,21 @@ const DiscoverTv = () => {
     titles,
     fetchMore,
     error,
-  } = useDiscover<TvResult, never, FilterOptions>('/api/v1/discover/tv', {
-    ...preparedFilters,
-  });
+  } = useDiscover<TvResult, never, FilterOptions & { anime?: 'only' }>(
+    '/api/v1/discover/tv',
+    {
+      ...preparedFilters,
+      ...(anime ? { anime: 'only' as const } : {}),
+    }
+  );
 
   if (error) {
     return <ErrorPage statusCode={500} />;
   }
 
-  const title = intl.formatMessage(messages.discovertv);
+  const title = intl.formatMessage(
+    anime ? messages.animetv : messages.discovertv
+  );
 
   return (
     <>

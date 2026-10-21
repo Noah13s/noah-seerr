@@ -1,4 +1,5 @@
 import MobileMenu from '@app/components/Layout/MobileMenu';
+import Notifications from '@app/components/Layout/Notifications';
 import PullToRefresh from '@app/components/Layout/PullToRefresh';
 import SearchInput from '@app/components/Layout/SearchInput';
 import Sidebar from '@app/components/Layout/Sidebar';
@@ -31,7 +32,7 @@ const Layout = ({ children }: LayoutProps) => {
     }
   );
   const { data: issueResponse, mutate: revalidateIssueCount } = useSWR(
-    '/api/v1/issue/count',
+    currentSettings.issuesEnabled === false ? null : '/api/v1/issue/count',
     {
       revalidateOnMount: true,
     }
@@ -118,6 +119,7 @@ const Layout = ({ children }: LayoutProps) => {
             </button>
             <SearchInput />
             <div className="flex items-center">
+              <Notifications />
               <UserDropdown />
             </div>
           </div>

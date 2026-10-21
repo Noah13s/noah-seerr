@@ -1,0 +1,20 @@
+doctype html
+html
+  head
+    meta(charset='utf-8')
+    meta(name='viewport' content='width=device-width, initial-scale=1')
+  body(style='margin:0;background:#111827;font-family:Arial,sans-serif;color:#e5e7eb;')
+    table(role='presentation' style='width:100%;max-width:560px;margin:auto;padding:24px;')
+      tr
+        td
+          h1(style='font-size:22px;color:#fff;') #{applicationTitle}
+          h2(style='font-size:20px;color:#fff;') #{label}
+          p #{french ? 'Ce média peut être supprimé de la bibliothèque. Tous les demandeurs ont terminé le film ou la saison, ou abandonné la saison, et le délai de conservation est écoulé.' : 'This media is eligible for removal from the library. All requesters have finished the movie or season, or dropped the season, and the retention delay has elapsed.'}
+          p
+            strong #{french ? 'Demandeurs : ' : 'Requesters: '}
+            | #{requesters}
+          p #{french ? 'Délai de conservation : ' : 'Retention delay: '}#{retentionDays} #{french ? 'jours. Éligible depuis le ' : 'days. Eligible since '}#{eligibleAt}.
+          p #{french ? 'Aucun fichier ne sera supprimé sans votre confirmation. Les boutons ouvrent la vérification dans Seerr ; une connexion administrateur est requise.' : 'Nothing is deleted without your confirmation. The buttons open the review in Seerr; administrator sign-in is required.'}
+          p(style='margin:24px 0;')
+            a(href=deleteUrl style='display:block;padding:14px 20px;margin-bottom:12px;background:#be123c;border-radius:8px;text-align:center;color:#fff;text-decoration:none;font-weight:bold;') #{french ? 'Confirmer la suppression' : 'Confirm deletion'}
+            a(href=keepUrl style='display:block;padding:14px 20px;background:#4338ca;border-radius:8px;text-align:center;color:#fff;text-decoration:none;font-weight:bold;') #{french ? 'Annuler et conserver' : 'Cancel and keep media'}

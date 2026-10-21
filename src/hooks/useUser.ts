@@ -22,6 +22,7 @@ export interface User {
   userType: number;
   createdAt: Date;
   updatedAt: Date;
+  lastActiveAt?: Date | null;
   requestCount: number;
   settings?: UserSettings;
 }
@@ -32,6 +33,7 @@ export interface UserSettings {
   discoverRegion?: string;
   streamingRegion?: string;
   originalLanguage?: string;
+  showAnime?: boolean;
   locale?: string;
   notificationTypes: Partial<NotificationAgentTypes>;
   watchlistSyncMovies?: boolean;
@@ -57,7 +59,7 @@ export const useUser = ({
   initialData,
 }: { id?: number; initialData?: User } = {}): UserHookResponse => {
   const router = useRouter();
-  const isAuthPage = /^\/(login|setup|resetpassword(?:\/|$))/.test(
+  const isAuthPage = /^\/(login|setup|party|resetpassword)(?:\/|$)/.test(
     router.pathname
   );
 

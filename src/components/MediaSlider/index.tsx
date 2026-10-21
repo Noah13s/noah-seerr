@@ -74,7 +74,7 @@ const MediaSlider = ({
     );
   }
 
-  if (settings.currentSettings.hideBlocklisted) {
+  if (settings.currentSettings.blocklistEnabled !== false && settings.currentSettings.hideBlocklisted) {
     titles = titles.filter(
       (i) =>
         !(i.mediaType === 'movie' || i.mediaType === 'tv') ||

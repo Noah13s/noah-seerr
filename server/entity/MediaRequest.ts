@@ -188,7 +188,10 @@ export class MediaRequest {
         mediaType: requestBody.mediaType,
       });
     } else {
-      if (media.status === MediaStatus.BLOCKLISTED) {
+      if (
+        media.status === MediaStatus.BLOCKLISTED &&
+        getSettings().main.blocklistEnabled !== false
+      ) {
         logger.warn('Request for media blocked due to being blocklisted', {
           tmdbId: tmdbMedia.id,
           mediaType: requestBody.mediaType,
@@ -200,6 +203,8 @@ export class MediaRequest {
 
       if (
         (media.status === MediaStatus.UNKNOWN ||
+          (media.status === MediaStatus.BLOCKLISTED &&
+            getSettings().main.blocklistEnabled === false) ||
           media.status === MediaStatus.DELETED) &&
         !requestBody.is4k
       ) {
@@ -227,11 +232,11 @@ export class MediaRequest {
       .getMany();
 
     if (existing && existing.length > 0) {
-      // If there is an existing movie request that isn't declined, don't allow a new one.
+      // Inspect every request: the oldest completed cycle does not tell us
+      // whether a newer request is active, or whether a failed one may be retried.
       if (
         requestBody.mediaType === MediaType.MOVIE &&
-        existing[0].status !== MediaRequestStatus.DECLINED &&
-        existing[0].status !== MediaRequestStatus.COMPLETED
+        existing.some(r => [MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED].includes(r.status))
       ) {
         logger.warn('Duplicate request for media blocked', {
           tmdbId: tmdbMedia.id,
@@ -383,7 +388,10 @@ export class MediaRequest {
               request.status !== MediaRequestStatus.COMPLETED
           )
           .reduce((seasons, request) => {
-            const combinedSeasons = request.seasons.map(
+            const combinedSeasons = request.seasons.filter(season =>
+              season.status !== MediaRequestStatus.COMPLETED &&
+              season.status !== MediaRequestStatus.DECLINED
+            ).map(
               (season) => season.seasonNumber
             );
 

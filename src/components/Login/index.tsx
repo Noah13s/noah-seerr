@@ -4,12 +4,14 @@ import PlexLogo from '@app/assets/services/plex.svg';
 import Button from '@app/components/Common/Button';
 import ImageFader from '@app/components/Common/ImageFader';
 import PageTitle from '@app/components/Common/PageTitle';
+import DeviceSignIn from '@app/components/DevicePairing/DeviceSignIn';
 import LanguagePicker from '@app/components/Layout/LanguagePicker';
 import JellyfinLogin from '@app/components/Login/JellyfinLogin';
 import LocalLogin from '@app/components/Login/LocalLogin';
 import PlexLoginButton from '@app/components/Login/PlexLoginButton';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
+import { cleanupReturnPath } from '@app/utils/cleanupReturnPath';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import { XCircleIcon } from '@heroicons/react/24/solid';
@@ -71,7 +73,12 @@ const Login = () => {
   // valid user, we redirect the user to the home page as the login was successful.
   useEffect(() => {
     if (user) {
-      router.push('/');
+      const target = router.query.returnTo;
+      const destination =
+        typeof target === 'string' && /^\/pair-device(?:\?|$)/.test(target)
+          ? target
+          : cleanupReturnPath(router.query.next);
+      router.push(destination);
     }
   }, [user, router]);
 
@@ -252,6 +259,11 @@ const Login = () => {
                 }`}
               >
                 {additionalLoginOptions}
+                <DeviceSignIn
+                  onAuthenticated={() => {
+                    void revalidate();
+                  }}
+                />
               </div>
             </div>
           </>

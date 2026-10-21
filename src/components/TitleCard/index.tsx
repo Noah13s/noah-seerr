@@ -7,7 +7,10 @@ import Tooltip from '@app/components/Common/Tooltip';
 import RequestModal from '@app/components/RequestModal';
 import ErrorCard from '@app/components/TitleCard/ErrorCard';
 import Placeholder from '@app/components/TitleCard/Placeholder';
+import WatchStatusBadge from '@app/components/WatchHistory/WatchStatusBadge';
 import { useIsTouch } from '@app/hooks/useIsTouch';
+import useSettings from '@app/hooks/useSettings';
+import useWatchHistoryStatus from '@app/hooks/useWatchHistoryStatus';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -43,6 +46,8 @@ interface TitleCardProps {
   inProgress?: boolean;
   isAddedToWatchlist?: number | boolean;
   mutateParent?: () => void;
+  action?: React.ReactNode;
+  actionProgress?: number;
 }
 
 const messages = defineMessages('components.TitleCard', {
@@ -67,6 +72,8 @@ const TitleCard = ({
   inProgress = false,
   canExpand = false,
   mutateParent,
+  action,
+  actionProgress,
 }: TitleCardProps) => {
   const isTouch = useIsTouch();
   const intl = useIntl();
@@ -80,6 +87,10 @@ const TitleCard = ({
     useState<boolean>(!isAddedToWatchlist);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const watchHistoryEntry = useWatchHistoryStatus(
+    id,
+    mediaType === 'movie' || mediaType === 'tv' ? mediaType : undefined
+  );
 
   // Just to get the year from the date
   if (year) {
@@ -310,7 +321,8 @@ const TitleCard = ({
     { type: 'or' }
   );
 
-  const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
+  const { currentSettings } = useSettings();
+  const showHideButton = currentSettings.blocklistEnabled !== false && hasPermission([Permission.MANAGE_BLOCKLIST], {
     type: 'or',
   });
 
@@ -401,7 +413,9 @@ const TitleCard = ({
                     : intl.formatMessage(globalMessages.tvshow)}
               </div>
             </div>
-            {showDetail && currentStatus !== MediaStatus.BLOCKLISTED && (
+            {showDetail &&
+              (currentSettings.blocklistEnabled === false ||
+                currentStatus !== MediaStatus.BLOCKLISTED) && (
               <div className="flex flex-col gap-1">
                 {user?.userType !== UserType.PLEX &&
                   (toggleWatchlist ? (
@@ -468,6 +482,11 @@ const TitleCard = ({
               </div>
             )}
           </div>
+          {watchHistoryEntry && (
+            <div className="pointer-events-none absolute left-2 top-10 z-30">
+              <WatchStatusBadge entry={watchHistoryEntry} compact />
+            </div>
+          )}
           <Transition
             as={Fragment}
             show={isUpdating}
@@ -485,7 +504,7 @@ const TitleCard = ({
 
           <Transition
             as={Fragment}
-            show={!image || showDetail || showRequestModal}
+            show={!image || showDetail || showRequestModal || Boolean(action)}
             enter="transition-opacity"
             enterFrom="opacity-0"
             enterTo="opacity-100"
@@ -511,7 +530,9 @@ const TitleCard = ({
                 <div className="flex h-full w-full items-end">
                   <div
                     className={`px-2 text-white ${
-                      !showRequestButton ||
+                      action
+                        ? 'pb-14'
+                        : !showRequestButton ||
                       (currentStatus &&
                         currentStatus !== MediaStatus.UNKNOWN &&
                         currentStatus !== MediaStatus.DELETED)
@@ -538,7 +559,9 @@ const TitleCard = ({
                       className="whitespace-normal text-xs"
                       style={{
                         WebkitLineClamp:
-                          !showRequestButton ||
+                          action
+                            ? 2
+                            : !showRequestButton ||
                           (currentStatus &&
                             currentStatus !== MediaStatus.UNKNOWN &&
                             currentStatus !== MediaStatus.DELETED)
@@ -557,7 +580,9 @@ const TitleCard = ({
               </Link>
 
               <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 py-2">
+                {action}
                 {showRequestButton &&
+                  !action &&
                   (!currentStatus ||
                     currentStatus === MediaStatus.UNKNOWN ||
                     currentStatus === MediaStatus.DELETED) && (
@@ -575,6 +600,14 @@ const TitleCard = ({
                     </Button>
                   )}
               </div>
+              {actionProgress !== undefined && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden bg-black/70">
+                  <div
+                    className="h-full bg-indigo-500"
+                    style={{ width: `${Math.max(0, Math.min(100, actionProgress))}%` }}
+                  />
+                </div>
+              )}
             </div>
           </Transition>
         </div>

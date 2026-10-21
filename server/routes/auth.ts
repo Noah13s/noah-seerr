@@ -15,6 +15,7 @@ import { ApiError } from '@server/types/error';
 import { getAppVersion } from '@server/utils/appVersion';
 import { getHostname } from '@server/utils/getHostname';
 import axios from 'axios';
+import crypto from 'crypto';
 import { Router } from 'express';
 import net from 'net';
 import validator from 'validator';
@@ -22,12 +23,78 @@ import { z } from 'zod';
 
 const authRoutes = Router();
 
+const castDiagnosticCounts = new Map<number, { until: number; count: number }>();
+const castDiagnosticMedia = z.object({
+    id: z.number().optional(),
+    state: z.string().max(24).optional(),
+    item: z.string().max(40).optional(),
+    time: z.number().optional(),
+    subtitle: z.number().optional(),
+    audio: z.number().optional(),
+    active: z.array(z.number()).max(32).optional(),
+    text: z.array(z.number()).max(32).optional(),
+});
+const castDiagnosticBody = z.object({
+    phase: z.enum(['snapshot', 'command', 'ack', 'failed', 'restore']),
+    command: z.string().max(16).optional(),
+    value: z.number().optional(),
+    status: z.string().max(24).optional(),
+    selected: z.number().optional(),
+    nativeMedia: z.number().optional(),
+    nativeItem: z.string().max(40).optional(),
+    nativePaused: z.boolean().optional(),
+    media: z.array(castDiagnosticMedia).max(8),
+});
+authRoutes.post('/cast-diagnostics', isAuthenticated(Permission.ADMIN), (req, res) => {
+    if (!req.user) return res.status(401).end();
+    const parsed = castDiagnosticBody.safeParse(req.body);
+    if (!parsed.success)
+        return res.status(400).end();
+    const id = req.user.id, now = Date.now();
+    for (const [key, entry] of castDiagnosticCounts)
+        if (entry.until < now)
+            castDiagnosticCounts.delete(key);
+    let entry = castDiagnosticCounts.get(id);
+    if (!entry) {
+        entry = { until: now + 60000, count: 0 };
+        castDiagnosticCounts.set(id, entry);
+    }
+    if (++entry.count > 120)
+        return res.status(429).end();
+    logger.info('Cast diagnostics', {
+        label: 'Cast diagnostics',
+        userId: id,
+        ...parsed.data,
+    });
+    return res.status(204).end();
+});
 export const quickConnectSecret = z.object({
   secret: z
     .string()
     .min(8)
     .max(128)
     .regex(/^[A-Fa-f0-9]+$/),
+});
+
+authRoutes.post('/activity', isAuthenticated(), async (req, res, next) => {
+    if (!req.user || req.session?.userId !== req.user.id) {
+        return res.status(204).end();
+    }
+    try {
+        const now = new Date();
+        const cutoff = new Date(now.getTime() - 4 * 60 * 1000);
+        await getRepository(User)
+            .createQueryBuilder()
+            .update(User)
+            .set({ lastActiveAt: now })
+            .where('id = :id', { id: req.user.id })
+            .andWhere('(lastActiveAt IS NULL OR lastActiveAt < :cutoff)', { cutoff })
+            .execute();
+        return res.status(204).end();
+    }
+    catch (error) {
+        return next(error);
+    }
 });
 
 authRoutes.get('/me', isAuthenticated(), async (req, res) => {
@@ -59,11 +126,88 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
       discoverRegion: user.settings.discoverRegion,
       streamingRegion: user.settings.streamingRegion,
       originalLanguage: user.settings.originalLanguage,
+      showAnime: user.settings.showAnime ?? true,
       notificationTypes: user.settings.notificationTypes,
       watchlistSyncMovies: user.settings.watchlistSyncMovies,
       watchlistSyncTv: user.settings.watchlistSyncTv,
     },
   });
+});
+
+const managedJellyfinUsername = (userId: number) => `seerr-${userId}`;
+authRoutes.post('/jellyfin-warm', isAuthenticated(), async (req, res) => {
+    if (!req.user)
+        return res.status(401).end();
+    if (getSettings().main.mediaServerType !== MediaServerType.JELLYFIN ||
+        !/^[a-f0-9]{32}$/i.test(req.body?.itemId || ''))
+        return res.status(400).end();
+    const user = await getRepository(User)
+        .createQueryBuilder('user')
+        .addSelect('user.jellyfinAuthToken')
+        .where('user.id = :id', { id: req.user.id })
+        .getOne();
+    if (!user) return res.status(404).end();
+    try {
+        const prepared = await prepareWebPlayback({ session: req.session, user, settings: getSettings(), hostname: getHostname() });
+        await axios.post('http://127.0.0.1:5098/warm', { itemId: req.body.itemId, userId: user.jellyfinUserId }, {
+            headers: {
+                Authorization: `MediaBrowser Token="${prepared.accessToken}"`,
+            },
+            timeout: 8000,
+        });
+    }
+    catch {
+        /* Warmup is optional; native playback can still start normally. */
+    }
+    return res.status(204).end();
+});
+
+// Isolated browser playback sessions, revision 88.
+const prepareWebPlayback = require('../lib/native-playback-session.cjs').nativePlaybackSessions({ channel: 'web', request: (config: import("axios").AxiosRequestConfig) => axios.request(config) });
+const pendingManagedPlayback = new Map<number, Promise<User>>();
+const linkManagedPlayback = async (repository: ReturnType<typeof getRepository<User>>, original: User, settings: ReturnType<typeof getSettings>, hostname: string) => {
+    if (original.jellyfinUserId) return original;
+    if (pendingManagedPlayback.has(original.id)) return pendingManagedPlayback.get(original.id)!;
+    const work = (async () => {
+        const user = await repository.findOne({ where: { id: original.id } });
+        if (!user) throw { status: 404, code: 'SEERR_USER_NOT_FOUND' };
+        if (user.jellyfinUserId) return user;
+        const username = managedJellyfinUsername(user.id);
+        if (user.jellyfinUsername && user.jellyfinUsername !== username) {
+            throw { status: 409, code: 'JELLYFIN_RELINK_REQUIRED' };
+        }
+        const admin = new JellyfinAPI(hostname, settings.jellyfin.apiKey, Buffer.from('PLAYER_seerr_admin').toString('base64'));
+        const accounts = (await admin.getUsers()).users;
+        const account = accounts.find(item => item.Name === username) || await admin.createUser(username, crypto.randomBytes(48).toString('base64url'));
+        user.jellyfinUsername = account.Name;
+        user.jellyfinUserId = account.Id;
+        await repository.save(user);
+        return user;
+    })().finally(() => pendingManagedPlayback.delete(original.id));
+    pendingManagedPlayback.set(original.id, work);
+    return work;
+};
+authRoutes.get('/jellyfin-session', isAuthenticated(), async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Pragma', 'no-cache');
+    if (!req.user) return res.status(401).json({ code: 'SEERR_LOGIN_REQUIRED' });
+    if (req.session?.userId !== req.user.id) return res.status(401).json({ code: 'SEERR_LOGIN_REQUIRED' });
+    const settings = getSettings();
+    if (settings.main.mediaServerType !== MediaServerType.JELLYFIN) return res.status(409).json({ code: 'JELLYFIN_NOT_CONFIGURED' });
+    try {
+        const repository = getRepository(User);
+        let user = await repository.findOne({ where: { id: req.user.id } });
+        if (!user) return res.status(404).end();
+        user = await linkManagedPlayback(repository, user, settings, getHostname());
+        const result = await prepareWebPlayback({ session: req.session, user, settings, hostname: getHostname() });
+        return res.status(200).json({ ...result, serverName: settings.jellyfin.name || 'Jellyfin' });
+    } catch (failure) {
+        const error = failure as {status?: number; code?: string; response?: {status?: number}};
+        const status = error.status || (error.response?.status === 403 ? 403 : 502);
+        const code = error.code?.startsWith('JELLYFIN_') ? error.code : 'JELLYFIN_SESSION_UNAVAILABLE';
+        logger.warn('Browser playback session unavailable', { label: 'Auth', userId: req.user.id, status, code });
+        return res.status(status).json({ code, message: 'Unable to prepare your playback session.' });
+    }
 });
 
 authRoutes.post('/plex', async (req, res, next) => {
@@ -818,8 +962,8 @@ authRoutes.post(
             user.avatar = getUserAvatarUrl(user);
             await userRepository.save(user);
             logger.debug('Avatar updated during Quick Connect login', {
-              userId: user.id,
-              jellyfinUserId: user.jellyfinUserId,
+              userId: user?.id,
+              jellyfinUserId: user?.jellyfinUserId,
             });
           }
         } catch (error) {
@@ -902,6 +1046,28 @@ authRoutes.post('/local', async (req, res, next) => {
   }
 });
 
+
+const prepareNativePlayback = require('../lib/native-playback-session.cjs').nativePlaybackSessions({ request: (config: import("axios").AxiosRequestConfig) => axios.request(config) });
+authRoutes.get('/jellyfin-native-session', isAuthenticated(), async (req, res) => {
+    if (!req.user || req.session?.userId !== req.user.id) return res.status(401).json({ code: 'SEERR_LOGIN_REQUIRED' });
+    const settings = getSettings();
+    if (settings.main.mediaServerType !== MediaServerType.JELLYFIN) return res.status(409).json({ code: 'JELLYFIN_NOT_CONFIGURED' });
+    try {
+        const user = await getRepository(User).findOne({ where: { id: req.user.id } });
+        if (!user) return res.status(404).end();
+        const result = await prepareNativePlayback({ session: req.session, user, settings, hostname: getHostname() });
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('Pragma', 'no-cache');
+        return res.status(200).json(result);
+    } catch (failure) {
+        const error = failure as {status?: number; code?: string; response?: {status?: number}};
+        const status = error.status || (error.response?.status === 403 ? 403 : 502);
+        const code = error.code?.startsWith('JELLYFIN_') ? error.code : 'JELLYFIN_SESSION_UNAVAILABLE';
+        logger.warn('Native playback session unavailable', { label: 'Auth', userId: req.user.id, status, code });
+        return res.status(status).json({ code, message: 'Unable to prepare your playback session.' });
+    }
+});
+
 authRoutes.post('/logout', async (req, res, next) => {
   try {
     const userId = req.session?.userId;
@@ -921,12 +1087,16 @@ authRoutes.post('/logout', async (req, res, next) => {
         .where('user.id = :id', { id: userId })
         .getOne();
 
-      if (user?.jellyfinUserId && user.jellyfinDeviceId) {
+      const playbackDevices = settings.main.mediaServerType === MediaServerType.EMBY
+            ? [user?.jellyfinDeviceId].filter(Boolean)
+            : require('../lib/native-playback-session.cjs').playbackDeviceIds(req.session, user);
+        for (const playbackDeviceId of playbackDevices) {
         try {
           const baseUrl = getHostname();
           try {
             await axios.delete(`${baseUrl}/Devices`, {
-              params: { Id: user.jellyfinDeviceId },
+              params: { Id: playbackDeviceId },
+                            timeout: 8000, maxRedirects: 0,
               headers: {
                 Authorization: `MediaBrowser Client="Seerr", Device="Seerr", DeviceId="seerr", Version="${
                   settings.main.mediaServerType === MediaServerType.EMBY
@@ -939,16 +1109,16 @@ authRoutes.post('/logout', async (req, res, next) => {
             logger.error('Failed to delete Jellyfin device', {
               label: 'Auth',
               error: error instanceof Error ? error.message : 'Unknown error',
-              userId: user.id,
-              jellyfinUserId: user.jellyfinUserId,
+              userId: user?.id,
+              jellyfinUserId: user?.jellyfinUserId,
             });
           }
         } catch (error) {
           logger.error('Failed to delete Jellyfin device', {
             label: 'Auth',
             error: error instanceof Error ? error.message : 'Unknown error',
-            userId: user.id,
-            jellyfinUserId: user.jellyfinUserId,
+            userId: user?.id,
+            jellyfinUserId: user?.jellyfinUserId,
           });
         }
       }

@@ -6,10 +6,11 @@ import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import type { UpcomingRelease } from '@app/utils/releaseDates';
 import { MediaStatus } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import { useIntl } from 'react-intl';
+import useSWR from 'swr';
 
 const messages = defineMessages('components.StatusBadge', {
   status: '{status}',
@@ -19,6 +20,11 @@ const messages = defineMessages('components.StatusBadge', {
   managemedia: 'Manage {mediaType}',
   seasonnumber: 'S{seasonNumber}',
   seasonepisodenumber: 'S{seasonNumber}E{episodeNumber}',
+  awaitingTheatrical: 'In cinemas {date}',
+  awaitingDigital: 'Digital release {date}',
+  awaitingPhysical: 'Physical release {date}',
+  awaitingEpisode: 'Next episode {date}',
+  releaseUnknown: 'Requested · release date unknown',
 });
 
 interface StatusBadgeProps {
@@ -32,80 +38,96 @@ interface StatusBadgeProps {
   mediaType?: 'movie' | 'tv';
   title?: string | string[];
   statusLabelOverride?: string;
+  upcomingRelease?: UpcomingRelease;
 }
 
 const StatusBadge = ({
-  status,
-  downloadItem = [],
+  status: initialStatus,
+  downloadItem: initialDownloadItem = [],
   is4k = false,
-  inProgress = false,
-  plexUrl,
-  serviceUrl,
+  inProgress: initialInProgress = false,
   tmdbId,
   mediaType,
   title,
   statusLabelOverride,
+  upcomingRelease,
 }: StatusBadgeProps) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
   const settings = useSettings();
+  const shouldPoll =
+    !!tmdbId &&
+    !!mediaType &&
+    (initialInProgress ||
+      initialStatus === MediaStatus.PENDING ||
+      initialStatus === MediaStatus.PROCESSING ||
+      initialStatus === MediaStatus.PARTIALLY_AVAILABLE);
+  const { data: liveDetails } = useSWR<{
+    mediaInfo?: {
+      status: MediaStatus;
+      status4k: MediaStatus;
+      downloadStatus?: DownloadingItem[];
+      downloadStatus4k?: DownloadingItem[];
+    };
+  }>(shouldPoll ? `/api/v1/${mediaType}/${tmdbId}` : null, {
+    refreshInterval: 10000,
+    revalidateOnFocus: true,
+  });
+  const liveMedia = liveDetails?.mediaInfo;
+  const rawStatus = liveMedia
+    ? is4k ? liveMedia.status4k : liveMedia.status
+    : initialStatus;
+  const status = settings.currentSettings.blocklistEnabled === false &&
+    rawStatus === MediaStatus.BLOCKLISTED
+      ? MediaStatus.UNKNOWN
+      : rawStatus;
+  const downloadItem = liveMedia
+    ? (is4k ? liveMedia.downloadStatus4k : liveMedia.downloadStatus) ?? []
+    : initialDownloadItem;
+  const inProgress = liveMedia ? downloadItem.length > 0 : initialInProgress;
+  const distinctDownloads = downloadItem.filter(
+    (item, index, all) =>
+      all.findIndex((candidate) => candidate.downloadId === item.downloadId) === index
+  );
+  const totalSize = distinctDownloads.reduce((sum, item) => sum + item.size, 0);
+  const totalLeft = distinctDownloads.reduce((sum, item) => sum + item.sizeLeft, 0);
+  const downloadPercent = totalSize
+    ? Math.max(0, Math.min(100, Math.round((1 - totalLeft / totalSize) * 100)))
+    : 0;
+
+  const parsedReleaseDate = upcomingRelease
+    ? new Date(`${upcomingRelease.date.slice(0, 10)}T12:00:00`)
+    : undefined;
+  const processingLabel =
+    parsedReleaseDate && upcomingRelease
+      ? intl.formatMessage(
+          upcomingRelease.kind === 'theatrical'
+            ? messages.awaitingTheatrical
+            : upcomingRelease.kind === 'digital'
+              ? messages.awaitingDigital
+              : upcomingRelease.kind === 'physical'
+                ? messages.awaitingPhysical
+                : messages.awaitingEpisode,
+          {
+          date: intl.formatDate(parsedReleaseDate, {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          }),
+          }
+        )
+      : intl.formatMessage(messages.releaseUnknown);
 
   let mediaLink: string | undefined;
   let mediaLinkDescription: string | undefined;
 
-  const calculateDownloadProgress = (media: DownloadingItem) => {
-    return Math.round(((media?.size - media?.sizeLeft) / media?.size) * 100);
-  };
-
-  if (
-    mediaType &&
-    plexUrl &&
-    hasPermission(
-      is4k
-        ? [
-            Permission.REQUEST_4K,
-            mediaType === 'movie'
-              ? Permission.REQUEST_4K_MOVIE
-              : Permission.REQUEST_4K_TV,
-          ]
-        : [
-            Permission.REQUEST,
-            mediaType === 'movie'
-              ? Permission.REQUEST_MOVIE
-              : Permission.REQUEST_TV,
-          ],
-      {
-        type: 'or',
-      }
-    ) &&
-    (!is4k ||
-      (mediaType === 'movie'
-        ? settings.currentSettings.movie4kEnabled
-        : settings.currentSettings.series4kEnabled))
-  ) {
-    mediaLink = plexUrl;
-    mediaLinkDescription = intl.formatMessage(messages.playonplex, {
-      mediaServerName:
-        settings.currentSettings.mediaServerType === MediaServerType.EMBY
-          ? 'Emby'
-          : settings.currentSettings.mediaServerType === MediaServerType.PLEX
-            ? 'Plex'
-            : 'Jellyfin',
+  if (hasPermission(Permission.MANAGE_REQUESTS) && mediaType && tmdbId) {
+    mediaLink = `/${mediaType}/${tmdbId}?manage=1`;
+    mediaLinkDescription = intl.formatMessage(messages.managemedia, {
+      mediaType: intl.formatMessage(
+        mediaType === 'movie' ? globalMessages.movie : globalMessages.tvshow
+      ),
     });
-  } else if (hasPermission(Permission.MANAGE_REQUESTS)) {
-    if (mediaType && tmdbId) {
-      mediaLink = `/${mediaType}/${tmdbId}?manage=1`;
-      mediaLinkDescription = intl.formatMessage(messages.managemedia, {
-        mediaType: intl.formatMessage(
-          mediaType === 'movie' ? globalMessages.movie : globalMessages.tvshow
-        ),
-      });
-    } else if (hasPermission(Permission.ADMIN) && serviceUrl) {
-      mediaLink = serviceUrl;
-      mediaLinkDescription = intl.formatMessage(messages.openinarr, {
-        arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
-      });
-    }
   }
 
   const tooltipContent =
@@ -147,9 +169,7 @@ const StatusBadge = ({
             : 'bg-green-500/80'
       } transition-all duration-200 ease-in-out`}
       style={{
-        width: `${
-          downloadItem ? calculateDownloadProgress(downloadItem[0]) : 0
-        }%`,
+        width: `${downloadPercent}%`,
       }}
     />
   );
@@ -212,6 +232,7 @@ const StatusBadge = ({
                         })}
                       </span>
                     ))}
+                  <span className="ml-1 tabular-nums">{downloadPercent}%</span>
                   <Spinner className="ml-1 h-3 w-3" />
                 </>
               )}
@@ -277,6 +298,7 @@ const StatusBadge = ({
                         })}
                       </span>
                     ))}
+                  <span className="ml-1 tabular-nums">{downloadPercent}%</span>
                   <Spinner className="ml-1 h-3 w-3" />
                 </>
               )}
@@ -315,7 +337,7 @@ const StatusBadge = ({
                   {
                     status: inProgress
                       ? intl.formatMessage(globalMessages.processing)
-                      : intl.formatMessage(globalMessages.requested),
+                      : processingLabel,
                   }
                 )}
               </span>
@@ -342,6 +364,7 @@ const StatusBadge = ({
                         })}
                       </span>
                     ))}
+                  <span className="ml-1 tabular-nums">{downloadPercent}%</span>
                   <Spinner className="ml-1 h-3 w-3" />
                 </>
               )}
@@ -431,6 +454,7 @@ const StatusBadge = ({
                         })}
                       </span>
                     ))}
+                  <span className="ml-1 tabular-nums">{downloadPercent}%</span>
                   <Spinner className="ml-1 h-3 w-3" />
                 </>
               )}

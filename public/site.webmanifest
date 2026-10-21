@@ -1,7 +1,10 @@
 {
-  "name": "Seerr",
-  "short_name": "Seerr",
-  "start_url": "./",
+  "name": "Noah Stream",
+  "short_name": "Stream",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "description": "Discover, request and watch your personal media library.",
   "icons": [
     {
       "src": "./android-chrome-192x192.png",
@@ -31,6 +34,9 @@
   "theme_color": "#1f2937",
   "background_color": "#1f2937",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "categories": ["entertainment", "video"],
   "shortcuts": [
     {
       "name": "Discover",
@@ -60,6 +66,28 @@
       "icons": [
         {
           "src": "./user-icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Watch History",
+      "url": "/watch-history",
+      "icons": [
+        {
+          "src": "/clock-icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Offline library",
+      "url": "/offline.html",
+      "icons": [
+        {
+          "src": "/android-chrome-192x192.png",
           "sizes": "192x192",
           "type": "image/png"
         }

@@ -25,9 +25,15 @@ import RequestModal from '@app/components/RequestModal';
 import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
 import Season from '@app/components/TvDetails/Season';
+import MediaWatchEditor from '@app/components/WatchHistory/MediaWatchEditor';
+import MediaUpgrade from '@app/components/MediaUpgrade';
+import MediaTechnicalDetails from '@app/components/MediaTechnicalDetails';
+import WatchStatusBadge from '@app/components/WatchHistory/WatchStatusBadge';
 import useDeepLinks from '@app/hooks/useDeepLinks';
+import useWatchHistoryStatus from '@app/hooks/useWatchHistoryStatus';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
+import { getNextTvRelease } from '@app/utils/releaseDates';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -88,6 +94,7 @@ const messages = defineMessages('components.TvDetails', {
   network: '{networkCount, plural, one {Network} other {Networks}}',
   viewfullcrew: 'View Full Crew',
   play: 'Play on {mediaServerName}',
+  resume: 'Resume on {mediaServerName}',
   play4k: 'Play 4K on {mediaServerName}',
   seasons: '{seasonCount, plural, one {# Season} other {# Seasons}}',
   episodeRuntime: 'Episode Runtime',
@@ -120,6 +127,14 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   const settings = useSettings();
   const { user, hasPermission } = useUser();
   const router = useRouter();
+  const selectedSeason = Number(router.query.season);
+  const selectedEpisode = Number(router.query.episode);
+  const focusedSeason = Number.isInteger(selectedSeason) && selectedSeason > 0
+    ? selectedSeason
+    : undefined;
+  const focusedEpisode = Number.isInteger(selectedEpisode) && selectedEpisode > 0
+    ? selectedEpisode
+    : undefined;
   const intl = useIntl();
   const { locale } = useLocale();
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -133,6 +148,10 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     useState<boolean>(false);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
   const { addToast } = useToasts();
+  const watchHistoryEntry = useWatchHistoryStatus(
+    Number(router.query.tvId),
+    'tv'
+  );
 
   const {
     data,
@@ -140,13 +159,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     mutate: revalidate,
   } = useSWR<TvDetailsType>(`/api/v1/tv/${router.query.tvId}`, {
     fallbackData: tv,
-    refreshInterval: refreshIntervalHelper(
-      {
-        downloadStatus: tv?.mediaInfo?.downloadStatus,
-        downloadStatus4k: tv?.mediaInfo?.downloadStatus4k,
-      },
-      15000
-    ),
+    refreshInterval: 15000,
+    revalidateOnFocus: true,
   });
 
   const { data: ratingData } = useSWR<RTRating>(
@@ -188,6 +202,11 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     return <ErrorPage statusCode={404} />;
   }
 
+  const upcomingRelease = getNextTvRelease(
+    data.nextEpisodeToAir?.airDate,
+    data.firstAirDate
+  );
+
   const mediaLinks: PlayButtonLink[] = [];
 
   if (
@@ -197,9 +216,12 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     })
   ) {
     mediaLinks.push({
-      text: getAvailableMediaServerName(),
+      text: intl.formatMessage(messages.resume, {
+        mediaServerName: getAvailableMediaServerName(),
+      }),
       url: plexUrl,
       svg: <PlayIcon />,
+      watchProgress: { tmdbId: data.id, mediaType: 'tv', title: data.name },
     });
   }
 
@@ -211,9 +233,12 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     })
   ) {
     mediaLinks.push({
-      text: getAvailable4kMediaServerName(),
+      text: intl.formatMessage(messages.play4k, {
+        mediaServerName: getAvailable4kMediaServerName(),
+      }),
       url: plexUrl4k,
       svg: <PlayIcon />,
+      watchProgress: { tmdbId: data.id, mediaType: 'tv', title: data.name },
     });
   }
 
@@ -347,26 +372,26 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
 
   function getAvailableMediaServerName() {
     if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
+      return 'Emby';
     }
 
     if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Plex' });
+      return 'Plex';
     }
 
-    return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
+    return 'Jellyfin';
   }
 
   function getAvailable4kMediaServerName() {
     if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
+      return 'Emby';
     }
 
     if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
-      return intl.formatMessage(messages.play4k, { mediaServerName: 'Plex' });
+      return 'Plex';
     }
 
-    return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
+    return 'Jellyfin';
   }
 
   const onClickWatchlistBtn = async (): Promise<void> => {
@@ -477,7 +502,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     closeBlocklistModal();
   };
 
-  const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
+  const showHideButton = settings.currentSettings.blocklistEnabled !== false && hasPermission([Permission.MANAGE_BLOCKLIST], {
     type: 'or',
   });
 
@@ -573,6 +598,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               mediaType="tv"
               plexUrl={plexUrl}
               serviceUrl={data.mediaInfo?.serviceUrl}
+              upcomingRelease={upcomingRelease}
             />
             {settings.currentSettings.series4kEnabled &&
               hasPermission(
@@ -597,8 +623,12 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                   mediaType="tv"
                   plexUrl={plexUrl4k}
                   serviceUrl={data.mediaInfo?.serviceUrl4k}
+                  upcomingRelease={upcomingRelease}
                 />
               )}
+            {watchHistoryEntry && (
+              <WatchStatusBadge entry={watchHistoryEntry} />
+            )}
           </div>
           <h1 data-testid="media-title">
             {data.name}{' '}
@@ -622,6 +652,22 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
           </span>
         </div>
         <div className="media-actions">
+          <MediaWatchEditor
+            tmdbId={data.id}
+            mediaType="tv"
+            title={data.name}
+            releaseYear={data.firstAirDate ? Number(data.firstAirDate.slice(0, 4)) : undefined}
+            seasons={data.seasons}
+          />
+          {data.mediaInfo &&
+            (data.mediaInfo.status === MediaStatus.AVAILABLE ||
+              data.mediaInfo.status === MediaStatus.PARTIALLY_AVAILABLE) &&
+            hasPermission(Permission.MANAGE_REQUESTS) && (
+              <MediaUpgrade
+                tmdbId={data.id}
+                mediaType={MediaType.TV}
+              />
+            )}
           {showHideButton &&
             data?.mediaInfo?.status !== MediaStatus.PROCESSING &&
             data?.mediaInfo?.status !== MediaStatus.AVAILABLE &&
@@ -633,7 +679,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               >
                 <Button
                   buttonType={'ghost'}
-                  className="z-40 mr-2"
+                  className="media-action media-action-square z-40"
                   buttonSize={'md'}
                   onClick={() => setShowBlocklistModal(true)}
                 >
@@ -641,7 +687,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 </Button>
               </Tooltip>
             )}
-          {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
+          {(settings.currentSettings.blocklistEnabled === false ||
+            data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED) &&
             user?.userType !== UserType.PLEX && (
               <>
                 {toggleWatchlist ? (
@@ -650,7 +697,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                   >
                     <Button
                       buttonType={'ghost'}
-                      className="z-40 mr-2"
+                      className="media-action media-action-square z-40"
                       buttonSize={'md'}
                       onClick={onClickWatchlistBtn}
                     >
@@ -666,7 +713,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                     content={intl.formatMessage(messages.removefromwatchlist)}
                   >
                     <Button
-                      className="z-40 mr-2"
+                      className="media-action media-action-square z-40"
                       buttonSize={'md'}
                       onClick={onClickDeleteWatchlistBtn}
                     >
@@ -687,7 +734,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             isShowComplete={isComplete}
             is4kShowComplete={is4kComplete}
           />
-          {(data.mediaInfo?.status === MediaStatus.AVAILABLE ||
+          {settings.currentSettings.issuesEnabled !== false &&
+            (data.mediaInfo?.status === MediaStatus.AVAILABLE ||
             data.mediaInfo?.status === MediaStatus.PARTIALLY_AVAILABLE ||
             (settings.currentSettings.series4kEnabled &&
               hasPermission([Permission.REQUEST_4K, Permission.REQUEST_4K_TV], {
@@ -706,7 +754,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 <Button
                   buttonType="warning"
                   onClick={() => setShowIssueModal(true)}
-                  className="ml-2 first:ml-0"
+                  className="media-action media-action-square"
                 >
                   <ExclamationTriangleIcon />
                 </Button>
@@ -717,7 +765,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               <Button
                 buttonType="ghost"
                 onClick={() => setShowManager(true)}
-                className="relative ml-2 first:ml-0"
+                className="media-action media-action-square relative"
               >
                 <CogIcon className="!mr-0" />
                 {hasPermission(
@@ -741,6 +789,13 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
           )}
         </div>
       </div>
+      <MediaTechnicalDetails
+        mediaType="tv"
+        tmdbId={data.id}
+        available={Boolean(
+          data.mediaInfo?.jellyfinMediaId || data.mediaInfo?.jellyfinMediaId4k
+        )}
+      />
       <div className="media-overview">
         <div className="media-overview-left">
           {data.tagline && <div className="tagline">{data.tagline}</div>}
@@ -863,7 +918,10 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 }
 
                 return (
-                  <Disclosure key={`season-discoslure-${season.seasonNumber}`}>
+                  <Disclosure
+                    key={`season-disclosure-${season.seasonNumber}-${focusedSeason ?? 'none'}`}
+                    defaultOpen={season.seasonNumber === focusedSeason}
+                  >
                     {({ open }) => (
                       <>
                         <DisclosureButton
@@ -1096,7 +1154,17 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                           <DisclosurePanel className="w-full rounded-b-md border-b border-l border-r border-gray-700 px-4 pb-2">
                             <Season
                               tvId={data.id}
+                              tvTitle={data.name}
                               seasonNumber={season.seasonNumber}
+                              focusedEpisode={
+                                season.seasonNumber === focusedSeason
+                                  ? focusedEpisode
+                                  : undefined
+                              }
+                              isAvailable={
+                                mSeason?.status === MediaStatus.AVAILABLE ||
+                                mSeason?.status === MediaStatus.PARTIALLY_AVAILABLE
+                              }
                             />
                           </DisclosurePanel>
                         </Transition>

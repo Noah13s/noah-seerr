@@ -132,6 +132,7 @@ const useDiscover = <
   }
 
   if (
+    settings.currentSettings.blocklistEnabled !== false &&
     settings.currentSettings.hideBlocklisted &&
     hideBlocklisted &&
     hasPermission(Permission.MANAGE_BLOCKLIST)

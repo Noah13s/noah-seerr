@@ -15,6 +15,10 @@ import {
   refreshIntervalHelper,
 } from '@app/utils/refreshIntervalHelper';
 import {
+  getNextMovieRelease,
+  getNextTvRelease,
+} from '@app/utils/releaseDates';
+import {
   ArrowPathIcon,
   CheckIcon,
   PencilIcon,
@@ -414,6 +418,13 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
     );
   }
 
+  const upcomingRelease = isMovie(title)
+    ? getNextMovieRelease(
+        title.releases,
+        user?.settings?.discoverRegion ?? 'US',
+        title.releaseDate
+      )
+    : getNextTvRelease(title.nextEpisodeToAir?.airDate, title.firstAirDate);
   const requestDownloadStatus = getRequestDownloadStatus(
     requestData.media[requestData.is4k ? 'downloadStatus4k' : 'downloadStatus'],
     requestData.type === 'tv'
@@ -554,12 +565,13 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                   tmdbId={requestData.media.tmdbId}
                   mediaType={requestData.type}
                   plexUrl={requestData.is4k ? plexUrl4k : plexUrl}
-                  serviceUrl={
-                    requestData.is4k
-                      ? requestData.media.serviceUrl4k
-                      : requestData.media.serviceUrl
-                  }
-                />
+                serviceUrl={
+                  requestData.is4k
+                    ? requestData.media.serviceUrl4k
+                    : requestData.media.serviceUrl
+                }
+                upcomingRelease={upcomingRelease}
+              />
               )}
             </div>
             <div className="card-field">

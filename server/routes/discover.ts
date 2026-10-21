@@ -1,13 +1,12 @@
 import PlexTvAPI from '@server/api/plextv';
-import TheMovieDb, {
-  MovieSortOptionsIterable,
-  TvSortOptionsIterable,
-} from '@server/api/themoviedb';
-import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
+import TheMovieDb, { MovieSortOptionsIterable, TvSortOptionsIterable } from '@server/api/themoviedb';
+import { ANIME_KEYWORD_ID } from '@server/api/themoviedb/constants';
+import type { TmdbKeyword, TmdbMovieResult, TmdbTvResult } from '@server/api/themoviedb/interfaces';
 import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
+import { WatchHistory, WatchHistoryStatus } from '@server/entity/WatchHistory';
 import { Watchlist } from '@server/entity/Watchlist';
 import type {
   GenreSliderItem,
@@ -62,6 +61,17 @@ export const createTmdbWithBlocklistSettings = (): TheMovieDb => {
 
 const discoverRoutes = Router();
 
+// A hidden category must not be loaded by a copied slider URL either.
+discoverRoutes.use((req, res, next) => {
+  const animeOnly = req.query.anime === 'only' ||
+    String(req.query.keywords ?? '').split(/[,|]/).some((id) => id.trim() === String(ANIME_KEYWORD_ID)) ||
+    new RegExp(`^/keyword/${ANIME_KEYWORD_ID}/`).test(req.path);
+  if (req.user?.settings?.showAnime === false && animeOnly) {
+    return res.status(403).json({ message: 'Anime is hidden for this profile.' });
+  }
+  next();
+});
+
 const QueryFilterOptions = z.object({
   page: z.coerce.string().optional(),
   primaryReleaseDateGte: z.coerce.string().optional(),
@@ -72,6 +82,7 @@ const QueryFilterOptions = z.object({
   genre: z.coerce.string().optional(),
   keywords: z.coerce.string().optional(),
   excludeKeywords: z.coerce.string().optional(),
+  anime: z.enum(['only']).optional(),
   language: z.coerce.string().optional(),
   withRuntimeGte: z.coerce.string().optional(),
   withRuntimeLte: z.coerce.string().optional(),
@@ -102,19 +113,42 @@ const TvApiQuerySchema = QueryFilterOptions.omit({
   sortBy: z.enum(TvSortOptionsIterable).optional().catch(undefined),
 });
 
+const animeKeywordFilters = (query: z.infer<typeof QueryFilterOptions>) => {
+  const animeKeyword = String(ANIME_KEYWORD_ID);
+  const requestedKeywords = query.keywords?.split(/[,|]/) ?? [];
+  const explicitAnimeKeyword = requestedKeywords.includes(animeKeyword);
+  const animeOnly = query.anime === 'only';
+
+  return {
+    keywords: animeOnly
+      ? [...new Set([animeKeyword, ...requestedKeywords])].join(',')
+      : query.keywords,
+    excludeKeywords:
+      animeOnly || explicitAnimeKeyword
+        ? query.excludeKeywords
+        : [animeKeyword, query.excludeKeywords].filter(Boolean).join('|'),
+  };
+};
+
+const isLikelyAnime = (result: unknown): boolean => {
+  if (!result || typeof result !== 'object') return false;
+  const media = result as { genre_ids?: number[]; original_language?: string };
+  return media.original_language === 'ja' && !!media.genre_ids?.includes(16);
+};
+
 discoverRoutes.get('/movies', async (req, res, next) => {
   const tmdb = createTmdbWithRegionLanguage(req.user);
 
   try {
     const query = MovieApiQuerySchema.parse(req.query);
-    const keywords = query.keywords;
-    const excludeKeywords = query.excludeKeywords;
+    const { keywords, excludeKeywords } = animeKeywordFilters(query);
 
     const data = await tmdb.getDiscoverMovies({
       page: Number(query.page),
       sortBy: query.sortBy,
       language: req.locale ?? query.language,
-      originalLanguage: query.language,
+      originalLanguage:
+        query.language ?? (query.anime === 'only' ? 'all' : undefined),
       genre: query.genre,
       studio: query.studio,
       primaryReleaseDateLte: query.primaryReleaseDateLte
@@ -420,8 +454,7 @@ discoverRoutes.get('/tv', async (req, res, next) => {
 
   try {
     const query = TvApiQuerySchema.parse(req.query);
-    const keywords = query.keywords;
-    const excludeKeywords = query.excludeKeywords;
+    const { keywords, excludeKeywords } = animeKeywordFilters(query);
     const data = await tmdb.getDiscoverTv({
       page: Number(query.page),
       sortBy: query.sortBy,
@@ -434,7 +467,8 @@ discoverRoutes.get('/tv', async (req, res, next) => {
       firstAirDateGte: query.firstAirDateGte
         ? new Date(query.firstAirDateGte).toISOString().split('T')[0]
         : undefined,
-      originalLanguage: query.language,
+      originalLanguage:
+        query.language ?? (query.anime === 'only' ? 'all' : undefined),
       keywords,
       excludeKeywords,
       withRuntimeGte: query.withRuntimeGte,
@@ -765,10 +799,14 @@ discoverRoutes.get('/trending', async (req, res, next) => {
     } as const;
 
     const { data, mapper, type } = await trendingFetchers[mediaType]();
+    const results = data.results.filter(
+      (result) =>
+        req.user?.settings?.showAnime !== false || !isLikelyAnime(result)
+    );
 
     const media = await Media.getRelatedMedia(
       req.user,
-      data.results.map((result) => ({
+      results.map((result) => ({
         tmdbId: result.id,
         mediaType: isMovie(result) ? MediaType.MOVIE : MediaType.TV,
       })),
@@ -779,7 +817,7 @@ discoverRoutes.get('/trending', async (req, res, next) => {
       page: data.page,
       totalPages: data.total_pages,
       totalResults: data.total_results,
-      results: data.results.map((result) => {
+      results: results.map((result) => {
         // - If "type" is set (case: "movie" or "tv"), the mediaType must also match.
         // - If "type" is not set (case: "all"), only filter by tmdbId.
         const selectedMedia = media.find(
@@ -943,8 +981,14 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
   '/watchlist',
   async (req, res) => {
     const userRepository = getRepository(User);
-    const itemsPerPage = 20;
-    const page = req.query.page ? Number(req.query.page) : 1;
+    const requestedTake = Number(req.query.take);
+    const itemsPerPage = Number.isInteger(requestedTake)
+      ? Math.max(1, Math.min(1000, requestedTake))
+      : 20;
+    const requestedPage = Number(req.query.page);
+    const page = Number.isInteger(requestedPage) && requestedPage > 0
+      ? requestedPage
+      : 1;
     const offset = (page - 1) * itemsPerPage;
 
     const activeUser = await userRepository.findOne({
@@ -985,7 +1029,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     // List watchlist from Plex
     const plexTV = new PlexTvAPI(activeUser.plexToken);
 
-    const watchlist = await plexTV.getWatchlist({ offset });
+    const watchlist = await plexTV.getWatchlist({ offset, size: itemsPerPage });
 
     return res.json({
       page,
@@ -1001,5 +1045,148 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     });
   }
 );
+
+// Recommendations are built from the signed-in profile only. Ratings have the
+// strongest influence; recently watched titles and the personal watchlist can
+// supply seeds when a profile has not rated much yet.
+discoverRoutes.get('/personal-recommendations', async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const [history, watchlist] = await Promise.all([
+      getRepository(WatchHistory).find({
+        where: { user: { id: userId } },
+        order: { updatedAt: 'DESC' },
+      }),
+      getRepository(Watchlist).find({
+        where: { requestedBy: { id: userId } },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+
+    const excluded = new Set(
+      [...history, ...watchlist]
+        .filter((item) => item.tmdbId)
+        .map((item) => `${item.mediaType}:${item.tmdbId}`)
+    );
+    const seeds = history
+      .filter(
+        (item) =>
+          item.tmdbId &&
+          item.status !== WatchHistoryStatus.DROPPED &&
+          (item.rating ?? 3) >= 3
+      )
+      .map((item) => ({
+        mediaType: item.mediaType,
+        tmdbId: item.tmdbId!,
+        weight:
+          1 +
+          ((item.rating ?? 3) - 3) * 0.9 +
+          (item.status === WatchHistoryStatus.COMPLETED ? 0.5 : 0) +
+          (item.watchedAt &&
+          Date.now() - new Date(item.watchedAt).getTime() <
+            180 * 24 * 60 * 60 * 1000
+            ? 0.35
+            : 0),
+      }));
+    const seededIds = new Set(
+      seeds.map((item) => `${item.mediaType}:${item.tmdbId}`)
+    );
+    for (const item of watchlist) {
+      const key = `${item.mediaType}:${item.tmdbId}`;
+      if (!seededIds.has(key)) {
+        seeds.push({
+          mediaType: item.mediaType === MediaType.TV ? 'tv' : 'movie',
+          tmdbId: item.tmdbId,
+          weight: 0.9,
+        });
+        seededIds.add(key);
+      }
+    }
+    seeds.sort((a, b) => b.weight - a.weight);
+    const selectedSeeds = seeds.slice(0, 6);
+    res.setHeader('Cache-Control', 'private, no-store');
+    if (!selectedSeeds.length) {
+      return res.json({ results: [], hasProfileSignals: false });
+    }
+
+    const tmdb = createTmdbWithRegionLanguage(req.user);
+    const responses = await Promise.allSettled(
+      selectedSeeds.map(async (seed) => ({
+        seed,
+        results:
+          seed.mediaType === 'movie'
+            ? (
+                await tmdb.getMovieRecommendations({
+                  movieId: seed.tmdbId,
+                  language: req.locale,
+                })
+              ).results
+            : (
+                await tmdb.getTvRecommendations({
+                  tvId: seed.tmdbId,
+                  language: req.locale,
+                })
+              ).results,
+      }))
+    );
+    const candidates = new Map<
+      string,
+      {
+        score: number;
+        mediaType: 'movie' | 'tv';
+        result: TmdbMovieResult | TmdbTvResult;
+      }
+    >();
+    for (const response of responses) {
+      if (response.status !== 'fulfilled') continue;
+      const { seed, results } = response.value;
+      results.forEach((result, index) => {
+        if (!result.poster_path || ('adult' in result && result.adult)) return;
+        if (req.user?.settings?.showAnime === false && isLikelyAnime(result))
+          return;
+        const key = `${seed.mediaType}:${result.id}`;
+        if (excluded.has(key)) return;
+        const score =
+          seed.weight / (1 + index / 8) +
+          Math.min(result.vote_count, 1000) / 10000;
+        const existing = candidates.get(key);
+        candidates.set(key, {
+          score: (existing?.score ?? 0) + score,
+          mediaType: seed.mediaType,
+          result: result as TmdbMovieResult | TmdbTvResult,
+        });
+      });
+    }
+
+    const selected = [...candidates.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+    const media = await Media.getRelatedMedia(
+      req.user,
+      selected.map(({ mediaType, result }) => ({
+        mediaType,
+        tmdbId: result.id,
+      }))
+    );
+    return res.json({
+      hasProfileSignals: true,
+      results: selected.map(({ mediaType, result }) => {
+        const match = media.find(
+          (item) => item.tmdbId === result.id && item.mediaType === mediaType
+        );
+        return mediaType === 'movie'
+          ? mapMovieResult(result as TmdbMovieResult, match)
+          : mapTvResult(result as TmdbTvResult, match);
+      }),
+    });
+  } catch (e) {
+    logger.error('Unable to build personal recommendations', {
+      label: 'API',
+      errorMessage: e.message,
+      userId: req.user?.id,
+    });
+    next({ status: 500, message: 'Unable to retrieve recommendations.' });
+  }
+});
 
 export default discoverRoutes;

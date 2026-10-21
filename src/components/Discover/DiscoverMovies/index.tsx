@@ -21,6 +21,7 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.DiscoverMovies', {
   discovermovies: 'Movies',
+  animemovies: 'Anime Movies',
   activefilters:
     '{count, plural, one {# Active Filter} other {# Active Filters}}',
   sortPopularityAsc: 'Popularity Ascending',
@@ -44,7 +45,7 @@ const SortOptions: Record<string, TMDBSortOptions> = {
   TitleDesc: 'original_title.desc',
 } as const;
 
-const DiscoverMovies = () => {
+const DiscoverMovies = ({ anime = false }: { anime?: boolean }) => {
   const intl = useIntl();
   const router = useRouter();
   const updateQueryParams = useUpdateQueryParams({});
@@ -59,9 +60,9 @@ const DiscoverMovies = () => {
     titles,
     fetchMore,
     error,
-  } = useDiscover<MovieResult, unknown, FilterOptions>(
+  } = useDiscover<MovieResult, unknown, FilterOptions & { anime?: 'only' }>(
     '/api/v1/discover/movies',
-    preparedFilters
+    anime ? { ...preparedFilters, anime: 'only' } : preparedFilters
   );
   const [showFilters, setShowFilters] = useState(false);
 
@@ -69,7 +70,9 @@ const DiscoverMovies = () => {
     return <ErrorPage statusCode={500} />;
   }
 
-  const title = intl.formatMessage(messages.discovermovies);
+  const title = intl.formatMessage(
+    anime ? messages.animemovies : messages.discovermovies
+  );
 
   return (
     <>

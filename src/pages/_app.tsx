@@ -1,8 +1,11 @@
+import OfflineDownloadBootstrap from '@app/components/Common/OfflineDownloadBootstrap';
 import Layout from '@app/components/Layout';
 import LoadingBar from '@app/components/LoadingBar';
 import PWAHeader from '@app/components/PWAHeader';
+import PWAInstallPrompt from '@app/components/PWAInstallPrompt';
 import ServiceWorkerSetup from '@app/components/ServiceWorkerSetup';
 import StatusChecker from '@app/components/StatusChecker';
+import { CastingProvider } from '@app/context/CastingContext';
 import { InteractionProvider } from '@app/context/InteractionContext';
 import { LanguageContext } from '@app/context/LanguageContext';
 import { SettingsProvider } from '@app/context/SettingsContext';
@@ -10,6 +13,7 @@ import { UserContext } from '@app/context/UserContext';
 import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
 import '@app/styles/globals.css';
+import { cleanupReturnPath } from '@app/utils/cleanupReturnPath';
 import { polyfillIntl } from '@app/utils/polyfillIntl';
 import { getHostAndPort } from '@app/utils/urlHelper';
 import '@fontsource-variable/inter';
@@ -153,7 +157,9 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
     const handleBadgeUpdate = () => {
       if ('setAppBadge' in newNavigator) {
         if (
-          !router.pathname.match(/(login|setup|resetpassword)/) &&
+          !router.pathname.match(
+            /(login|setup|resetpassword)|^\/(party(?:\/|$)|pair-device$)/
+          ) &&
           hasPermission(Permission.ADMIN)
         ) {
           requestsCount().then((data) => {
@@ -178,7 +184,11 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
     };
   }, [hasPermission, router.pathname]);
 
-  if (router.pathname.match(/(login|setup|resetpassword)/)) {
+  if (
+    router.pathname.match(
+      /(login|setup|resetpassword)|^\/(party(?:\/|$)|pair-device$)/
+    )
+  ) {
     component = <Component {...pageProps} />;
   } else {
     component = (
@@ -218,7 +228,11 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
               </Head>
               <StatusChecker />
               <ServiceWorkerSetup />
-              <UserContext initialUser={user}>{component}</UserContext>
+              <PWAInstallPrompt />
+              <UserContext initialUser={user}>
+                <OfflineDownloadBootstrap />
+                <CastingProvider>{component}</CastingProvider>
+              </UserContext>
               <Toaster
                 position="top-right"
                 toastOptions={{ duration: 4000 }}
@@ -244,6 +258,8 @@ CoreApp.getInitialProps = async (initialProps) => {
     applicationUrl: '',
     hideAvailable: false,
     hideBlocklisted: false,
+    issuesEnabled: true,
+    blocklistEnabled: true,
     hideRequested: false,
     movie4kEnabled: false,
     series4kEnabled: false,
@@ -299,7 +315,7 @@ CoreApp.getInitialProps = async (initialProps) => {
 
         if (router.pathname.match(/(setup|login)/)) {
           ctx.res.writeHead(307, {
-            Location: '/',
+            Location: cleanupReturnPath(router.query.next),
           });
           ctx.res.end();
         }
@@ -307,9 +323,16 @@ CoreApp.getInitialProps = async (initialProps) => {
         // If there is no user, and ctx.res is set (to check if we are on the server side)
         // _AND_ we are not already on the login or setup route, redirect to /login with a 307
         // before anything actually renders
-        if (!router.pathname.match(/(login|setup|resetpassword)/)) {
+        if (
+          !router.pathname.match(
+            /(login|setup|resetpassword)|^\/(party(?:\/|$)|pair-device$)/
+          )
+        ) {
           ctx.res.writeHead(307, {
-            Location: '/login',
+            Location:
+              cleanupReturnPath(ctx.asPath || router.asPath) === '/'
+                ? '/login'
+                : `/login?next=${encodeURIComponent(cleanupReturnPath(ctx.asPath || router.asPath))}`,
           });
           ctx.res.end();
         }

@@ -1,70 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#1f2937" />
-
-    <title>You are offline</title>
-
-    <!-- Inline the page's stylesheet. -->
-    <style>
-      body {
-        font-family: helvetica, arial, sans-serif;
-        margin: 2em;
-        background-color: #111827;
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#151b28"><title>Noah Stream · Offline</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:#151b28;color:#f9fafb}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 85% 0%,#383078,transparent 35%),#151b28}header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem clamp(1rem,4vw,3rem);border-bottom:1px solid #ffffff1f;background:#151b28b8}.brand{font-size:1.25rem;font-weight:750;letter-spacing:-.03em}.brand span{color:#a38cff}a,button{border:1px solid #77819880;border-radius:.65rem;padding:.7rem 1rem;color:#fff;background:#222a3a;font:inherit;cursor:pointer;text-decoration:none}a:hover,button:hover,a:focus-visible,button:focus-visible{border-color:#a38cff;outline:none;background:#30394d}main{width:min(1100px,100%);margin:auto;padding:clamp(1.25rem,4vw,3rem)}h1{font-size:clamp(1.7rem,4vw,2.7rem);letter-spacing:-.04em;margin:.5rem 0}p{color:#b8c1d2;line-height:1.5}#status{min-height:1.5rem}#library{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:1rem;margin-top:2rem}article{border:1px solid #ffffff24;background:#20283a;border-radius:1rem;padding:1.25rem;min-width:0;box-shadow:0 12px 30px #0002}.kind{display:inline-block;border-radius:999px;background:#5740a3;padding:.25rem .6rem;font-size:.75rem;font-weight:700;text-transform:uppercase}h2{font-size:1.1rem;line-height:1.35;margin:1rem 0 .5rem;overflow-wrap:anywhere}.meta{font-size:.85rem;color:#b8c1d2;margin-bottom:1rem}.actions{display:flex;flex-wrap:wrap;gap:.5rem}.primary{background:#6546d8;border-color:#8066ed;font-weight:650}.danger{color:#ffc8c8}#playerArea[hidden]{display:none}#playerArea{margin-top:1.5rem}video{display:block;width:100%;max-height:75vh;background:#000;border-radius:.75rem}.empty{border:1px dashed #8690a480;border-radius:1rem;padding:2rem;text-align:center;color:#b8c1d2;grid-column:1/-1}@media(max-width:560px){header{align-items:flex-start}.brand{font-size:1.05rem}header a{font-size:.85rem}main{padding:1.25rem}.actions>*{flex:1;text-align:center}}
+</style></head><body><header><div class="brand"><span>◉</span> Noah Stream</div><a href="/" id="home">Back to catalog</a></header><main><h1 id="heading">Available offline</h1><p id="intro">Your saved videos stay on this device. Downloads are separate for each profile and can be removed here.</p><p id="status" role="status"></p><section id="playerArea" hidden><h2 id="playerTitle"></h2><video id="player" controls playsinline preload="metadata"></video></section><section id="library" aria-label="Offline library"></section></main>
+<script>
+(() => {
+  const french = (localStorage.getItem('noah-stream-offline-locale') || navigator.language).startsWith('fr');
+  const t = (en, fr) => french ? fr : en;
+  const $ = (id) => document.getElementById(id);
+  $('home').textContent = t('Back to catalog', 'Retour au catalogue');
+  $('heading').textContent = t('Available offline', 'Disponibles hors ligne');
+  $('intro').textContent = t('Your saved videos stay on this device. Downloads are separate for each profile and can be removed here.', 'Les vidéos enregistrées restent sur cet appareil. Les téléchargements sont séparés par profil et peuvent être supprimés ici.');
+  let objectUrl = null;
+  let directory;
+  const profile = Number(localStorage.getItem('noah-stream-offline-profile'));
+  const player = $('player');
+  const fileName = (entry) => `${entry.id}.${entry.mimeType === 'video/webm' ? 'webm' : entry.mimeType === 'video/ogg' ? 'ogv' : 'mp4'}`;
+  const openDeviceDatabase = () => new Promise((resolve, reject) => {
+    const request = indexedDB.open('noah-stream-device-files', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('folders');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const deviceFolder = async (entry) => {
+    const database = await openDeviceDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction('folders', 'readonly');
+      const request = transaction.objectStore('folders').get(`profile-${profile}:${entry.id}`);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => database.close();
+    });
+  };
+  const forgetDeviceFolder = async (entry) => {
+    const database = await openDeviceDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction('folders', 'readwrite');
+      transaction.objectStore('folders').delete(`profile-${profile}:${entry.id}`);
+      transaction.oncomplete = () => { database.close(); resolve(); };
+      transaction.onerror = () => { database.close(); reject(transaction.error); };
+    });
+  };
+  const stop = () => { player.pause(); player.removeAttribute('src'); player.load(); if (objectUrl) URL.revokeObjectURL(objectUrl); objectUrl = null; $('playerArea').hidden = true; };
+  async function load() {
+    const library = $('library'); library.replaceChildren();
+    if (!navigator.storage?.getDirectory || !Number.isSafeInteger(profile) || profile < 1) { $('status').textContent = t('No offline profile on this device yet.', 'Aucun profil hors ligne sur cet appareil.'); return; }
+    try {
+      const root = await navigator.storage.getDirectory();
+      const app = await root.getDirectoryHandle('noah-stream-offline');
+      directory = await app.getDirectoryHandle(`profile-${profile}`);
+      const index = await directory.getFileHandle('index.json');
+      const entries = JSON.parse(await (await index.getFile()).text());
+      const quota = await navigator.storage.estimate();
+      const size = (bytes) => `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+      $('status').textContent = `${entries.length} ${t('saved', 'enregistré(s)')} · ${t('Browser storage used', 'Stockage navigateur utilisé')} ${size(quota.usage || 0)} / ${size(quota.quota || 0)}`;
+      if (!entries.length) { const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = t('No saved videos yet. Open an available movie or episode while online and choose Make available offline.', 'Aucune vidéo enregistrée. Ouvrez un film ou un épisode disponible en ligne puis choisissez Disponible hors ligne.'); library.append(empty); return; }
+      for (const entry of entries) {
+        const savedFolder = entry.storage === 'device' ? await deviceFolder(entry).catch(() => null) : null;
+        const card = document.createElement('article');
+        const kind = document.createElement('span'); kind.className = 'kind'; kind.textContent = entry.kind === 'episode' ? t('Episode', 'Épisode') : t('Movie', 'Film');
+        const title = document.createElement('h2'); title.textContent = entry.title;
+        const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${(entry.bytes / 1024 / 1024 / 1024).toFixed(2)} GB · ${new Date(entry.savedAt).toLocaleDateString(french ? 'fr-FR' : 'en-US')} · ${entry.storage === 'device' ? t('Device folder', 'Dossier local') : t('Browser storage', 'Stockage navigateur')}`;
+        const actions = document.createElement('div'); actions.className = 'actions';
+        const play = document.createElement('button'); play.className = 'primary'; play.textContent = t('Play', 'Lire');
+        play.onclick = async () => { try { stop(); let file; if (entry.storage === 'device') { if (!savedFolder || await savedFolder.requestPermission({mode:'read'}) !== 'granted') throw new Error('Folder access denied'); file = await (await savedFolder.getFileHandle(entry.deviceFileName)).getFile(); } else { file = await (await directory.getFileHandle(fileName(entry))).getFile(); } objectUrl = URL.createObjectURL(file); $('playerTitle').textContent = entry.title; $('playerArea').hidden = false; player.src = objectUrl; $('playerArea').scrollIntoView({behavior:'smooth'}); await player.play().catch((error) => { $('status').textContent = error.name === 'NotAllowedError' ? t('Press Play in the video controls to start this file.', 'Appuyez sur Lecture dans les commandes vidéo pour démarrer ce fichier.') : t('This browser cannot play the saved video format.', 'Ce navigateur ne peut pas lire le format vidéo enregistré.'); }); } catch { $('status').textContent = t('Allow access to the saved video folder, then try again.', 'Autorisez l’accès au dossier de la vidéo, puis réessayez.'); } };
+        const remove = document.createElement('button'); remove.className = 'danger'; remove.textContent = t('Remove', 'Supprimer');
+        remove.onclick = async () => { try { if (entry.storage === 'device' && (!savedFolder || await savedFolder.requestPermission({mode:'readwrite'}) !== 'granted')) throw new Error('Folder access denied'); if (!confirm(t('Remove this offline copy?', 'Supprimer cette copie hors ligne ?'))) return; stop(); if (entry.storage === 'device') { await savedFolder.removeEntry(entry.deviceFileName); } else { await directory.removeEntry(fileName(entry)); } const next = entries.filter((item) => item.id !== entry.id); const handle = await directory.getFileHandle('index.json', {create:true}); const stream = await handle.createWritable(); await stream.write(JSON.stringify(next)); await stream.close(); if (entry.storage === 'device') await forgetDeviceFolder(entry); await load(); } catch { $('status').textContent = t('Could not remove this file. Check folder access and try again.', 'Impossible de supprimer ce fichier. Vérifiez l’accès au dossier et réessayez.'); } };
+        actions.append(play, remove); card.append(kind, title, meta, actions); library.append(card);
       }
-
-      h1 {
-        color: #6366f1;
-      }
-
-      p {
-        margin-block: 1rem;
-      }
-
-      button {
-        display: block;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>You are offline</h1>
-
-    <button type="button">↻ Reload</button>
-
-    <!-- Inline the page's JavaScript file. -->
-    <script>
-      // Manual reload feature.
-      document.querySelector('button').addEventListener('click', () => {
-        window.location.reload();
-      });
-
-      // Listen to changes in the network state, reload when online.
-      // This handles the case when the device is completely offline.
-      window.addEventListener('online', () => {
-        window.location.reload();
-      });
-
-      // Check if the server is responding and reload the page if it is.
-      // This handles the case when the device is online, but the server
-      // is offline or misbehaving.
-      async function checkNetworkAndReload() {
-        try {
-          const response = await fetch('.');
-          // Verify we get a valid response from the server
-          if (response.status >= 200 && response.status < 500) {
-            window.location.reload();
-            return;
-          }
-        } catch {
-          // Unable to connect to the server, ignore.
-        }
-        window.setTimeout(checkNetworkAndReload, 2500);
-      }
-
-      checkNetworkAndReload();
-    </script>
-  </body>
-</html>
+    } catch { $('status').textContent = t('No saved videos for this profile yet.', 'Aucune vidéo enregistrée pour ce profil.'); }
+  }
+  window.addEventListener('pagehide', stop); load();
+})();
+</script></body></html>

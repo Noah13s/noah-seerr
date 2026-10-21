@@ -3,8 +3,10 @@
 // previously cached resources to be updated from the network.
 // This variable is intentionally declared and unused.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const OFFLINE_VERSION = 5;
-const CACHE_NAME = 'offline';
+const OFFLINE_VERSION = 11;
+const CACHE_PREFIX = 'noah-stream';
+const CACHE_NAME = `${CACHE_PREFIX}-offline-${OFFLINE_VERSION}`;
+const STATIC_CACHE_NAME = `${CACHE_PREFIX}-static-${OFFLINE_VERSION}`;
 // Customize this with a different URL if needed.
 const OFFLINE_URL = '/offline.html';
 
@@ -15,7 +17,12 @@ self.addEventListener('install', (event) => {
       // Setting {cache: 'reload'} in the new request will ensure that the
       // response isn't fulfilled from the HTTP cache; i.e., it will be from
       // the network.
-      await cache.add(new Request(OFFLINE_URL, { cache: 'reload' }));
+      await cache.addAll([
+        new Request(OFFLINE_URL, { cache: 'reload' }),
+        new Request('/site.webmanifest', { cache: 'reload' }),
+        new Request('/android-chrome-192x192.png', { cache: 'reload' }),
+        new Request('/android-chrome-512x512.png', { cache: 'reload' }),
+      ]);
     })()
   );
   // Force the waiting service worker to become the active service worker.
@@ -30,6 +37,17 @@ self.addEventListener('activate', (event) => {
       if ('navigationPreload' in self.registration) {
         await self.registration.navigationPreload.enable();
       }
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter(
+            (name) =>
+              name.startsWith(CACHE_PREFIX) &&
+              name !== CACHE_NAME &&
+              name !== STATIC_CACHE_NAME
+          )
+          .map((name) => caches.delete(name))
+      );
     })()
   );
 
@@ -38,6 +56,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
   // We only want to call event.respondWith() if this is a navigation request
   // for an HTML page.
   if (event.request.mode === 'navigate') {
@@ -66,6 +86,23 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
       })()
+    );
+    return;
+  }
+
+  const url = new URL(event.request.url);
+  const isVersionedStaticAsset =
+    url.origin === self.location.origin && url.pathname.startsWith('/_next/static/');
+
+  if (isVersionedStaticAsset) {
+    event.respondWith(
+      caches.open(STATIC_CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+        const response = await fetch(event.request);
+        if (response.ok) await cache.put(event.request, response.clone());
+        return response;
+      })
     );
   }
 });

@@ -47,6 +47,11 @@ const ErrorCard = ({ id, tmdbId, tvdbId, type, canExpand }: ErrorCardProps) => {
     });
     mutate('/api/v1/discover/watchlist');
     mutate('/api/v1/media?filter=allavailable&take=20&sort=mediaAdded');
+    mutate(
+      (key) =>
+        Array.isArray(key) &&
+        key[0] === '/api/v1/media?filter=allavailable&take=20&sort=mediaAdded'
+    );
     mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
   };
 

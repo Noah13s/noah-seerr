@@ -22,9 +22,24 @@ export enum DiscoverSliderType {
   TMDB_NETWORK,
   TMDB_MOVIE_STREAMING_SERVICES,
   TMDB_TV_STREAMING_SERVICES,
+  CONTINUE_WATCHING,
+  PERSONAL_RECOMMENDATIONS,
+  POPULAR_ANIME_TV,
+  POPULAR_ANIME_MOVIES,
 }
 
+export const isAnimeDiscoverSlider = (slider: Partial<DiscoverSlider>): boolean =>
+  slider.type === DiscoverSliderType.POPULAR_ANIME_TV ||
+  slider.type === DiscoverSliderType.POPULAR_ANIME_MOVIES ||
+  ((slider.type === DiscoverSliderType.TMDB_MOVIE_KEYWORD ||
+    slider.type === DiscoverSliderType.TMDB_TV_KEYWORD) &&
+    !!slider.data?.split(/[,|]/).some((keyword) => keyword.trim() === '210024'));
+
 export const defaultSliders: Partial<DiscoverSlider>[] = [
+  { type: DiscoverSliderType.CONTINUE_WATCHING, enabled: true, isBuiltIn: true, order: 0 },
+  { type: DiscoverSliderType.PERSONAL_RECOMMENDATIONS, enabled: true, isBuiltIn: true, order: 1 },
+  { type: DiscoverSliderType.POPULAR_ANIME_TV, enabled: true, isBuiltIn: true, order: 2 },
+  { type: DiscoverSliderType.POPULAR_ANIME_MOVIES, enabled: true, isBuiltIn: true, order: 3 },
   {
     type: DiscoverSliderType.RECENTLY_ADDED,
     enabled: true,
@@ -97,4 +112,4 @@ export const defaultSliders: Partial<DiscoverSlider>[] = [
     isBuiltIn: true,
     order: 11,
   },
-];
+].map((slider, index) => ({ ...slider, order: index }));
