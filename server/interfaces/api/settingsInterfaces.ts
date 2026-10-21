@@ -31,6 +31,8 @@ export interface PublicSettingsResponse {
   applicationUrl: string;
   hideAvailable: boolean;
   hideBlocklisted: boolean;
+  issuesEnabled: boolean;
+  blocklistEnabled: boolean;
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;

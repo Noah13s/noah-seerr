@@ -20,3 +20,10 @@ export interface MediaWatchDataResponse {
     playCount30Days: number;
   };
 }
+
+export interface MediaTechnicalResponse {
+  fileCount: number;
+  qualities: { resolution: number | null; count: number }[];
+  audio: { en: number; fr: number; unknown: number };
+  subtitles: { en: number; fr: number };
+}

@@ -48,6 +48,7 @@ export class User {
     'jellyfinDeviceId',
     'jellyfinAuthToken',
     'plexToken',
+    'lastActiveAt',
     'settings',
   ];
 
@@ -158,6 +159,9 @@ export class User {
   })
   public updatedAt: Date;
 
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public lastActiveAt?: Date | null;
+
   public warnings: string[] = [];
 
   constructor(init?: Partial<User>) {
@@ -212,6 +216,7 @@ export class User {
     await this.setPassword(password);
 
     const { applicationTitle, applicationUrl } = getSettings().main;
+    const frenchEmail = this.settings?.locale?.startsWith('fr') ?? false;
     try {
       logger.info(`Sending generated password email for ${this.email}`, {
         label: 'User Management',
@@ -228,6 +233,15 @@ export class User {
           applicationUrl,
           applicationTitle,
           recipientName: this.username,
+          subject: frenchEmail ? 'Informations de compte' : 'Account information',
+          greeting: frenchEmail ? 'Bonjour' : 'Hello',
+          accountCreated: frenchEmail
+            ? `Un compte a été créé pour vous sur ${applicationTitle}.`
+            : `An account has been created for you at ${applicationTitle}.`,
+          passwordLabel: frenchEmail ? 'Votre mot de passe :' : 'Your password is:',
+          openLabel: frenchEmail
+            ? `Ouvrir ${applicationTitle}`
+            : `Open ${applicationTitle}`,
         },
       });
     } catch (e) {
@@ -248,6 +262,7 @@ export class User {
     this.recoveryLinkExpirationDate = targetDate;
 
     const { applicationTitle, applicationUrl } = getSettings().main;
+    const frenchEmail = this.settings?.locale?.startsWith('fr') ?? false;
     const resetPasswordLink = `${applicationUrl}/resetpassword/${guid}`;
 
     try {
@@ -266,6 +281,18 @@ export class User {
           applicationTitle,
           recipientName: this.displayName,
           recipientEmail: this.email,
+          subject: frenchEmail ? 'Réinitialisation du mot de passe' : 'Password reset',
+          greeting: frenchEmail ? 'Bonjour' : 'Hello',
+          resetExplanation: frenchEmail
+            ? `Une demande de changement du mot de passe de votre compte ${applicationTitle} a été reçue.`
+            : `A request has been received to change the password for your ${applicationTitle} account.`,
+          resetLabel: frenchEmail ? 'Réinitialiser le mot de passe' : 'Reset password',
+          expiryLabel: frenchEmail
+            ? 'Ce lien expire dans 24 heures.'
+            : 'This link expires in 24 hours.',
+          ignoreLabel: frenchEmail
+            ? "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail."
+            : 'If you did not initiate this request, you may safely disregard this message.',
         },
       });
     } catch (e) {
