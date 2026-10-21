@@ -141,6 +141,8 @@ export interface MainSettings {
   };
   hideAvailable: boolean;
   hideBlocklisted: boolean;
+  issuesEnabled: boolean;
+  blocklistEnabled: boolean;
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
@@ -195,6 +197,8 @@ interface FullPublicSettings extends PublicSettings {
   applicationUrl: string;
   hideAvailable: boolean;
   hideBlocklisted: boolean;
+  issuesEnabled: boolean;
+  blocklistEnabled: boolean;
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
@@ -419,6 +423,8 @@ class Settings {
         },
         hideAvailable: false,
         hideBlocklisted: false,
+        issuesEnabled: true,
+        blocklistEnabled: true,
         hideRequested: false,
         localLogin: true,
         mediaServerLogin: true,
@@ -717,6 +723,8 @@ class Settings {
       applicationUrl: this.data.main.applicationUrl,
       hideAvailable: this.data.main.hideAvailable,
       hideBlocklisted: this.data.main.hideBlocklisted,
+      issuesEnabled: this.data.main.issuesEnabled,
+      blocklistEnabled: this.data.main.blocklistEnabled,
       hideRequested: this.data.main.hideRequested,
       localLogin: this.data.main.localLogin,
       mediaServerLogin: this.data.main.mediaServerLogin,

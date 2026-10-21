@@ -12,6 +12,7 @@ import {
   prepareSession,
   type JellyfinSession,
 } from '@app/utils/jellyfinSession';
+import { PlayerBridge, type PlayerSnapshot } from '@app/utils/playerBridge';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import type { WatchHistoryItem } from '@server/interfaces/api/watchHistoryInterfaces';
@@ -28,10 +29,10 @@ const messages = defineMessages('components.PlayButton', {
     'Your Jellyfin account must be linked once in Profile > Linked accounts.',
   playerUnavailable:
     'The player cannot be prepared right now. Please try again shortly.',
-  connecting: 'Connecting to player…',
+  connecting: 'Connecting to playerÃ¢â‚¬Â¦',
   backToSeerr: 'Back to Seerr',
-  starting: 'Starting playback…',
-  optimizing: 'Optimizing playback for your device…',
+  starting: 'Starting playbackÃ¢â‚¬Â¦',
+  optimizing: 'Optimizing playback for your deviceÃ¢â‚¬Â¦',
   resume: 'Resume',
   progress: '{percent}% watched',
   rateTitle: 'Rate {title}',
@@ -80,7 +81,7 @@ const youtubeEmbedUrl = (url: string): string => {
       )}?autoplay=1&rel=0`;
     }
   } catch {
-    // L'URL Jellyfin peut être relative ; elle est valide telle quelle.
+    // L'URL Jellyfin peut ÃƒÂªtre relative ; elle est valide telle quelle.
   }
   return url;
 };
@@ -89,12 +90,14 @@ const playerUrl = (
   link: PlayButtonLink,
   compatible: boolean,
   recovery: { itemId: string; position: number } | null,
-  prepare = false
+  prepare = false,
+  bridgeId = ''
 ) => {
   if (!isJellyfinUrl(link.url)) return youtubeEmbedUrl(link.url);
   const url = new URL(link.url, window.location.origin);
   url.searchParams.set('seerrAutoplay', '1');
-  url.searchParams.set('seerrPlayer', '77-2');
+  url.searchParams.set('seerrPlayer', 'source100');
+  url.searchParams.set('seerrBridgeId', bridgeId);
   if (link.resumeTicks !== undefined)
     url.searchParams.set('seerrResumeTicks', String(link.resumeTicks));
   if (prepare) url.searchParams.set('seerrPrepare', '1');
@@ -142,6 +145,13 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
   };
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const preparationOwner = useRef({});
+  const bridgeId = useRef('');
+  if (typeof window !== 'undefined' && !bridgeId.current)
+    bridgeId.current = crypto.randomUUID();
+  const bridge = useRef<PlayerBridge | null>(null);
+  const latestSnapshot = useRef<PlayerSnapshot | null>(null);
+  const activeLinkRef = useRef(activeLink);
+  activeLinkRef.current = activeLink;
   const [preparedLink, setPreparedLink] = useState<PlayButtonLink | null>(null);
   const [preparationGeneration, setPreparationGeneration] = useState(0);
   useEffect(() => {
@@ -222,12 +232,9 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
       : jellyfinProgress.hasProgress;
   const [isOpening, setIsOpening] = useState(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-  const [compatiblePlayback, setCompatiblePlayback] = useState(false);
-  const [playerGeneration, setPlayerGeneration] = useState(0);
-  const [recoveryPosition, setRecoveryPosition] = useState<{
-    itemId: string;
-    position: number;
-  } | null>(null);
+  const compatiblePlayback = false;
+  const playerGeneration = 0;
+  const recoveryPosition = null;
   const playbackPosition = useRef<{ itemId: string; position: number } | null>(
     null
   );
@@ -354,12 +361,7 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
     document.addEventListener('keydown', closeOnEscape);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    if (
-      preparedLink &&
-      frameRef.current?.contentDocument?.readyState === 'complete'
-    ) {
-      startJellyfinPlayback(frameRef.current);
-    }
+    if (frameRef.current) startJellyfinPlayback(frameRef.current);
     return () => {
       stopAutoStart.current?.();
       stopAutoStart.current = null;
@@ -370,14 +372,11 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
     };
   }, [activeLink]);
 
-  if (!links || !links.length) return null;
-
   const open = async (requestedLink: PlayButtonLink) => {
     const link = { ...requestedLink, resumeTicks: resumeFor(requestedLink) };
     setPlayError(null);
-    setCompatiblePlayback(false);
-    setRecoveryPosition(null);
     playbackPosition.current = null;
+    latestSnapshot.current = null;
     lastProgressSignature.current = null;
     viewingSessions.current = {};
     resolvedWatchContext.current = link.watchProgress ?? null;
@@ -389,20 +388,9 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
 
     playbackIntent.current = link.url;
 
-    const nativeStart = (
-      frameRef.current?.contentWindow as
-        | (Window & {
-            __seerrStartPrepared?: (ticks?: number) => Promise<void>;
-          })
-        | null
-    )?.__seerrStartPrepared;
     if (preparedLink?.url === link.url) {
       setIsPlayerReady(false);
       setActiveLink(link);
-      // Retain an iframe that is still booting. Its readiness handshake below
-      // consumes the Play intent as soon as native preparation completes.
-      if (nativeStart)
-        void nativeStart(link.resumeTicks).catch(() => recoverPlayback());
       return;
     }
     setPreparedLink(null);
@@ -430,354 +418,94 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
     }
   };
 
-  const recoverPlayback = () => {
-    setPreparedLink(null);
-    setRecoveryPosition(playbackPosition.current);
-    setIsPlayerReady(false);
-    setCompatiblePlayback(true);
-    setPlayerGeneration((generation) => generation + 1);
-  };
-
-  const startJellyfinPlayback = (frame: HTMLIFrameElement) => {
-    if (!activeLink || !isJellyfinUrl(activeLink.url)) {
-      setIsPlayerReady(true);
-      return;
-    }
-
-    stopAutoStart.current?.();
-    stopJellyfinNavigation.current?.();
-    stopJellyfinNavigation.current = null;
-
-    const frameWindow = frame.contentWindow;
-    const frameDocument = frame.contentDocument;
-    if (!frameWindow || !frameDocument) {
-      setActiveLink(null);
-      setPlayError(intl.formatMessage(messages.playerUnavailable));
-      return;
-    }
-
-    let playbackStarted = false;
-    let trackingInstalled = false;
-    let episodeLookupStarted = false;
-    let observer: MutationObserver | null = null;
-    let interval: ReturnType<typeof setInterval> | null = null;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    let stopTracking: (() => void) | null = null;
-    let attemptedVideo: HTMLVideoElement | null = null;
-    let attemptedSource = '';
-    let requiresGesture = false;
-    let stopped = false;
-
-    const playbackFailed = () => {
-      cleanup();
-      setActiveLink(null);
-      setPlayError(intl.formatMessage(messages.playerUnavailable));
-    };
-
-    const onPlaybackMessage = (event: MessageEvent) => {
+  const progressReporter = useRef(recordProgress);
+  progressReporter.current = recordProgress;
+  const onPlayerEvent = useRef<(event: string, state?: PlayerSnapshot) => void>(
+    () => {}
+  );
+  onPlayerEvent.current = (event, state) => {
+    const selected = activeLinkRef.current;
+    if (
+      state &&
+      Number.isFinite(state.position) &&
+      Number.isFinite(state.duration)
+    ) {
+      latestSnapshot.current = state;
+      const context = selected?.watchProgress;
       if (
-        event.source !== frameWindow ||
-        event.origin !== window.location.origin
-      )
-        return;
-      const data = event.data;
-      if (data?.type === 'seerr-player-prepared') {
-        const targetId = new URLSearchParams(
-          new URL(activeLink.url, window.location.origin).hash.split('?')[1] ||
-            ''
-        ).get('id');
-        if (data.itemId === targetId) attemptStart();
-        return;
-      }
-      if (
-        !data ||
-        !['seerr-playback-position', 'seerr-playback-stalled'].includes(
-          data.type
-        ) ||
-        !/^[a-f0-9]{32}$/i.test(data.itemId) ||
-        !Number.isFinite(data.position) ||
-        data.position < 0 ||
-        data.position > 86400
-      )
-        return;
-      playbackPosition.current = {
-        itemId: data.itemId,
-        position: data.position,
-      };
-      if (data.type !== 'seerr-playback-stalled') return;
-      if (!compatiblePlayback) {
-        recoverPlayback();
-      } else {
-        // Bound recovery: a persistent failure returns to the media's Play action.
-        playbackFailed();
-      }
-    };
-    window.addEventListener('message', onPlaybackMessage);
-
-    const cleanup = () => {
-      observer?.disconnect();
-      if (interval) clearInterval(interval);
-      if (timeout) clearTimeout(timeout);
-      frameDocument.removeEventListener('loadeddata', attemptStart, true);
-      frameDocument.removeEventListener('playing', attemptStart, true);
-      frameWindow.removeEventListener('hashchange', attemptStart);
-    };
-
-    const isVideoRoute = () =>
-      /(?:#!?\/|#\/)video(?:\?|$)/.test(frameWindow.location.hash);
-
-    const revealPlayableVideo = () => {
-      if (stopped) return false;
-      const video = frameDocument.querySelector<HTMLVideoElement>('video');
-      if (
-        !isVideoRoute() ||
-        !video ||
-        video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
-        !video.videoWidth
+        context?.mediaType === 'tv' &&
+        Number.isInteger(state.seasonNumber) &&
+        Number.isInteger(state.episodeNumber)
       ) {
-        return false;
+        resolvedWatchContext.current = {
+          ...context,
+          seasonNumber: state.seasonNumber,
+          episodeNumber: state.episodeNumber,
+        };
       }
-      // Show the actual player only after playback starts. If browser autoplay
-      // policy requires a gesture, its normal Play control is the only action.
-      if (video.paused && !requiresGesture) return false;
-      cleanup();
-      setIsPlayerReady(true);
-      return true;
-    };
-
-    const resolveCurrentEpisode = async () => {
-      const context = activeLink?.watchProgress;
-      if (
-        context?.mediaType !== 'tv' ||
-        (context.seasonNumber && context.episodeNumber)
-      )
-        return;
-      const query = frameWindow.location.hash.split('?')[1];
-      const itemId = query
-        ? (new URLSearchParams(query).get('id') ??
-          new URLSearchParams(query).get('itemId'))
-        : null;
-      if (!itemId) return;
-      try {
-        const { data } = await axios.get<{
-          seasonNumber: number;
-          episodeNumber: number;
-        }>(
-          `/api/v1/tv/${context.tmdbId}/playback-item/${encodeURIComponent(itemId)}`
+      if (selected && ['position', 'state', 'firstFrame'].includes(event)) {
+        void progressReporter.current(
+          state.position,
+          state.duration,
+          event === 'state'
         );
-        resolvedWatchContext.current = { ...context, ...data };
-      } catch {
-        // Playback continues; the series-level history remains available.
       }
-    };
-
-    const protectSeerrNavigation = () => {
-      if (stopJellyfinNavigation.current) return;
-
-      let reachedPlayer = false;
-      let interval: ReturnType<typeof setInterval> | null = null;
-
-      const returnToSeerr = () => {
-        // Hide the embedded document before Jellyfin gets a chance to paint
-        // its library/details route. This avoids the distracting flash users
-        // would see after pressing Jellyfin's own back button.
-        frameDocument.documentElement.style.visibility = 'hidden';
-        stopJellyfinNavigation.current?.();
-        stopJellyfinNavigation.current = null;
-        closePlayer();
-      };
-
-      const watchNavigation = () => {
-        if (isVideoRoute()) {
-          reachedPlayer = true;
-          return;
-        }
-
-        if (!reachedPlayer) return;
-
-        returnToSeerr();
-      };
-
-      // Jellyfin uses hash routes. Listening to the route change lets us
-      // close the embedded player in the same turn as its own back action,
-      // rather than after a polling delay.
-      const onNavigation = () => watchNavigation();
-      frameWindow.addEventListener('hashchange', onNavigation);
-      frameWindow.addEventListener('popstate', onNavigation);
-      interval = setInterval(watchNavigation, 200);
-      stopJellyfinNavigation.current = () => {
-        frameWindow.removeEventListener('hashchange', onNavigation);
-        frameWindow.removeEventListener('popstate', onNavigation);
-        if (interval) clearInterval(interval);
-      };
-      watchNavigation();
-    };
-
-    const attemptStart = () => {
-      if (isVideoRoute()) {
-        if (!episodeLookupStarted) {
-          episodeLookupStarted = true;
-          void resolveCurrentEpisode();
-        }
-        protectSeerrNavigation();
-        if (!trackingInstalled) {
-          trackingInstalled = true;
-          const installTracking = () => {
-            const video =
-              frameDocument.querySelector<HTMLVideoElement>('video');
-            if (!video) return false;
-            const report = (force = false) => {
-              const snapshot = (
-                frameWindow as Window & {
-                  __seerrPlaybackSnapshot?: () => {
-                    position: number;
-                    duration: number;
-                    seasonNumber?: number;
-                    episodeNumber?: number;
-                  } | null;
-                }
-              ).__seerrPlaybackSnapshot;
-              if (snapshot) {
-                const state = snapshot();
-                if (state) {
-                  const context = activeLink.watchProgress;
-                  if (
-                    context?.mediaType === 'tv' &&
-                    Number.isInteger(state.seasonNumber) &&
-                    Number.isInteger(state.episodeNumber)
-                  )
-                    resolvedWatchContext.current = {
-                      ...context,
-                      seasonNumber: state.seasonNumber,
-                      episodeNumber: state.episodeNumber,
-                    };
-                  void recordProgress(state.position, state.duration, force);
-                }
-              } else {
-                void recordProgress(video.currentTime, video.duration, force);
-              }
-            };
-            const onTimeUpdate = () => report();
-            const onEnded = () => report(true);
-            video.addEventListener('timeupdate', onTimeUpdate);
-            video.addEventListener('ended', onEnded);
-            video.addEventListener('pause', onEnded);
-            video.addEventListener('seeked', onEnded);
-            const progressInterval = setInterval(() => report(), 20_000);
-            stopTracking = () => {
-              clearInterval(progressInterval);
-              video.removeEventListener('timeupdate', onTimeUpdate);
-              video.removeEventListener('ended', onEnded);
-              video.removeEventListener('pause', onEnded);
-              video.removeEventListener('seeked', onEnded);
-              report(true);
-            };
-            return true;
-          };
-          if (!installTracking()) {
-            const installInterval = setInterval(() => {
-              if (installTracking()) clearInterval(installInterval);
-            }, 500);
-            setTimeout(() => clearInterval(installInterval), 15_000);
-          }
-        }
-        const video = frameDocument.querySelector<HTMLVideoElement>('video');
-        if (
-          video?.currentSrc &&
-          (video !== attemptedVideo || video.currentSrc !== attemptedSource)
-        ) {
-          attemptedVideo = video;
-          attemptedSource = video.currentSrc;
-          if (video.paused) {
-            void video
-              .play()
-              .then(revealPlayableVideo)
-              .catch((error: unknown) => {
-                if (
-                  error &&
-                  typeof error === 'object' &&
-                  'name' in error &&
-                  error.name === 'NotAllowedError'
-                ) {
-                  requiresGesture = true;
-                  revealPlayableVideo();
-                }
-              });
-          }
-        }
-        revealPlayableVideo();
-        return;
-      }
-
-      if (playbackStarted) return;
-      const nativeStart = frameWindow as Window & {
-        __seerrInstantStart?: string;
-        __seerrStartPrepared?: (ticks?: number) => Promise<void>;
-      };
-      if (
-        nativeStart.__seerrInstantStart === 'prepared' &&
-        nativeStart.__seerrStartPrepared
-      ) {
-        playbackStarted = true;
-        void nativeStart
-          .__seerrStartPrepared(activeLink.resumeTicks)
-          .catch(() => recoverPlayback());
-        return;
-      }
-      if (
-        nativeStart.__seerrInstantStart &&
-        nativeStart.__seerrInstantStart !== 'fallback'
-      )
-        return;
-
-      const selectors = [
-        '.btnPlayOrResume:not([disabled])',
-        '.detailPagePrimaryContainer .btnPlay:not(.hide):not([disabled])',
-        '.detailButton[data-action="resume"]:not(.hide):not([disabled])',
-        '.detailButton[data-action="play"]:not(.hide):not([disabled])',
-      ];
-
-      const playButton = selectors
-        .map((selector) =>
-          frameDocument.querySelector<HTMLButtonElement>(selector)
-        )
-        .find((button) => button && button.getClientRects().length > 0);
-
-      if (playButton) {
-        playbackStarted = true;
-        playButton.click();
-      }
-    };
-
-    frameDocument.addEventListener('loadeddata', attemptStart, true);
-    frameDocument.addEventListener('playing', attemptStart, true);
-    frameWindow.addEventListener('hashchange', attemptStart);
-    observer = new MutationObserver(attemptStart);
-    observer.observe(frameDocument.documentElement, {
-      attributes: true,
-      childList: true,
-      subtree: true,
-    });
-    interval = setInterval(attemptStart, 200);
-    timeout = setTimeout(
-      () => {
-        cleanup();
-        if (!compatiblePlayback) {
-          recoverPlayback();
-          return;
-        }
-        playbackFailed();
-      },
-      compatiblePlayback ? 45000 : 30000
-    );
-    stopAutoStart.current = () => {
-      stopped = true;
-      cleanup();
-      stopTracking?.();
-      window.removeEventListener('message', onPlaybackMessage);
-    };
-    attemptStart();
+    }
+    if (event === 'firstFrame') setIsPlayerReady(true);
+    if (event === 'close') closePlayer();
+    if (event === 'error') {
+      playbackIntent.current = null;
+      bridge.current?.close();
+      bridge.current = null;
+      setActiveLink(null);
+      setPreparedLink(null);
+      setPlayError(intl.formatMessage(messages.playerUnavailable));
+    }
   };
+
+  const startJellyfinPlayback = (frame: HTMLIFrameElement, loaded = false) => {
+    const source = activeLinkRef.current || preparedLink;
+    if (!source || !isJellyfinUrl(source.url) || !frame.contentWindow) return;
+    if (
+      loaded ||
+      !bridge.current ||
+      bridge.current.frame !== frame.contentWindow
+    ) {
+      // WindowProxy survives navigation. Retire the previous document's endpoint
+      // without sending Stop into the newly loaded document.
+      bridge.current?.close(!loaded);
+      bridge.current = new PlayerBridge(
+        frame.contentWindow,
+        bridgeId.current,
+        (event, state) => onPlayerEvent.current(event, state)
+      );
+    }
+    if (!activeLinkRef.current) return;
+    void bridge.current
+      .play(activeLinkRef.current.resumeTicks)
+      .catch((failure: unknown) => {
+        if (failure instanceof Error && failure.message === 'PLAYER_STOPPED')
+          return;
+        onPlayerEvent.current('error');
+      });
+    stopAutoStart.current = () => {
+      const state = latestSnapshot.current;
+      if (state)
+        void progressReporter.current(state.position, state.duration, true);
+      bridge.current?.close();
+      bridge.current = null;
+    };
+  };
+
+  useEffect(
+    () => () => {
+      bridge.current?.close();
+      bridge.current = null;
+    },
+    []
+  );
+
+  if (!links || !links.length) return null;
 
   return (
     <>
@@ -793,14 +521,14 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
           className="media-action media-action-play"
           aria-label={
             hasResume
-              ? `${intl.formatMessage(messages.resume)} · ${Math.round(
+              ? `${intl.formatMessage(messages.resume)} Ã‚Â· ${Math.round(
                   resumePercent
                 )}%`
               : links[0].text
           }
           title={
             hasResume
-              ? `${intl.formatMessage(messages.resume)} · ${Math.round(
+              ? `${intl.formatMessage(messages.resume)} Ã‚Â· ${Math.round(
                   resumePercent
                 )}%`
               : links[0].text
@@ -892,17 +620,7 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
                   <CastButton
                     link={activeLink}
                     resolveLink={() => {
-                      const frame = frameRef.current?.contentWindow as
-                        | (Window & {
-                            __seerrPlaybackSnapshot?: () => {
-                              itemId?: string;
-                              position: number;
-                              seasonNumber?: number;
-                              episodeNumber?: number;
-                            } | null;
-                          })
-                        | null;
-                      const snapshot = frame?.__seerrPlaybackSnapshot?.();
+                      const snapshot = latestSnapshot.current;
                       if (
                         !snapshot?.itemId ||
                         !/^[a-f0-9]{32}$/i.test(snapshot.itemId)
@@ -936,15 +654,7 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
                       };
                     }}
                     handoff={() => {
-                      const frame = frameRef.current?.contentWindow as
-                        | (Window & {
-                            __seerrPlaybackSnapshot?: () => {
-                              itemId?: string;
-                              position: number;
-                            } | null;
-                          })
-                        | null;
-                      const snapshot = frame?.__seerrPlaybackSnapshot?.();
+                      const snapshot = latestSnapshot.current;
                       const position = snapshot?.position;
                       return {
                         itemId: snapshot?.itemId,
@@ -990,7 +700,8 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
                   (preparedLink || activeLink) as PlayButtonLink,
                   compatiblePlayback,
                   recoveryPosition,
-                  Boolean(preparedLink)
+                  Boolean(preparedLink),
+                  bridgeId.current
                 )}
                 title={(activeLink || preparedLink)?.text}
                 className={`absolute inset-0 h-full w-full border-0 bg-black transition-opacity duration-200 ${
@@ -1003,7 +714,7 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={(event) => {
-                  if (activeLink) startJellyfinPlayback(event.currentTarget);
+                  startJellyfinPlayback(event.currentTarget, true);
                 }}
               />
             </div>
