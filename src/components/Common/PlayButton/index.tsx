@@ -1,4 +1,3 @@
-import { PlayerBridge, type PlayerSnapshot } from '@app/utils/playerBridge';
 import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
 import CastButton from '@app/components/Common/CastButton';
 import PartyButton from '@app/components/Party/PartyButton';
@@ -13,6 +12,7 @@ import {
   prepareSession,
   type JellyfinSession,
 } from '@app/utils/jellyfinSession';
+import { PlayerBridge, type PlayerSnapshot } from '@app/utils/playerBridge';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import type { WatchHistoryItem } from '@server/interfaces/api/watchHistoryInterfaces';
@@ -146,7 +146,8 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const preparationOwner = useRef({});
   const bridgeId = useRef('');
-  if (typeof window !== 'undefined' && !bridgeId.current) bridgeId.current = crypto.randomUUID();
+  if (typeof window !== 'undefined' && !bridgeId.current)
+    bridgeId.current = crypto.randomUUID();
   const bridge = useRef<PlayerBridge | null>(null);
   const latestSnapshot = useRef<PlayerSnapshot | null>(null);
   const activeLinkRef = useRef(activeLink);
@@ -371,11 +372,11 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
     };
   }, [activeLink]);
 
-
   const open = async (requestedLink: PlayButtonLink) => {
     const link = { ...requestedLink, resumeTicks: resumeFor(requestedLink) };
     setPlayError(null);
     playbackPosition.current = null;
+    latestSnapshot.current = null;
     lastProgressSignature.current = null;
     viewingSessions.current = {};
     resolvedWatchContext.current = link.watchProgress ?? null;
@@ -419,17 +420,35 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
 
   const progressReporter = useRef(recordProgress);
   progressReporter.current = recordProgress;
-  const onPlayerEvent = useRef<(event: string, state?: PlayerSnapshot) => void>(() => {});
+  const onPlayerEvent = useRef<(event: string, state?: PlayerSnapshot) => void>(
+    () => {}
+  );
   onPlayerEvent.current = (event, state) => {
     const selected = activeLinkRef.current;
-    if (state && Number.isFinite(state.position) && Number.isFinite(state.duration)) {
+    if (
+      state &&
+      Number.isFinite(state.position) &&
+      Number.isFinite(state.duration)
+    ) {
       latestSnapshot.current = state;
       const context = selected?.watchProgress;
-      if (context?.mediaType === 'tv' && Number.isInteger(state.seasonNumber) && Number.isInteger(state.episodeNumber)) {
-        resolvedWatchContext.current = { ...context, seasonNumber: state.seasonNumber, episodeNumber: state.episodeNumber };
+      if (
+        context?.mediaType === 'tv' &&
+        Number.isInteger(state.seasonNumber) &&
+        Number.isInteger(state.episodeNumber)
+      ) {
+        resolvedWatchContext.current = {
+          ...context,
+          seasonNumber: state.seasonNumber,
+          episodeNumber: state.episodeNumber,
+        };
       }
       if (selected && ['position', 'state', 'firstFrame'].includes(event)) {
-        void progressReporter.current(state.position, state.duration, event === 'state');
+        void progressReporter.current(
+          state.position,
+          state.duration,
+          event === 'state'
+        );
       }
     }
     if (event === 'firstFrame') setIsPlayerReady(true);
@@ -444,30 +463,47 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
     }
   };
 
-  const startJellyfinPlayback = (frame: HTMLIFrameElement) => {
+  const startJellyfinPlayback = (frame: HTMLIFrameElement, loaded = false) => {
     const source = activeLinkRef.current || preparedLink;
     if (!source || !isJellyfinUrl(source.url) || !frame.contentWindow) return;
-    if (!bridge.current || bridge.current.frame !== frame.contentWindow) {
-      bridge.current?.close();
-      bridge.current = new PlayerBridge(frame.contentWindow, bridgeId.current, (event, state) => onPlayerEvent.current(event, state));
+    if (
+      loaded ||
+      !bridge.current ||
+      bridge.current.frame !== frame.contentWindow
+    ) {
+      // WindowProxy survives navigation. Retire the previous document's endpoint
+      // without sending Stop into the newly loaded document.
+      bridge.current?.close(!loaded);
+      bridge.current = new PlayerBridge(
+        frame.contentWindow,
+        bridgeId.current,
+        (event, state) => onPlayerEvent.current(event, state)
+      );
     }
     if (!activeLinkRef.current) return;
-    void bridge.current.play(activeLinkRef.current.resumeTicks).catch((failure: unknown) => {
-      if (failure instanceof Error && failure.message === 'PLAYER_STOPPED') return;
-      onPlayerEvent.current('error');
-    });
+    void bridge.current
+      .play(activeLinkRef.current.resumeTicks)
+      .catch((failure: unknown) => {
+        if (failure instanceof Error && failure.message === 'PLAYER_STOPPED')
+          return;
+        onPlayerEvent.current('error');
+      });
     stopAutoStart.current = () => {
       const state = latestSnapshot.current;
-      if (state) void progressReporter.current(state.position, state.duration, true);
+      if (state)
+        void progressReporter.current(state.position, state.duration, true);
       bridge.current?.close();
       bridge.current = null;
     };
   };
 
-  useEffect(() => () => {
-    bridge.current?.close();
-    bridge.current = null;
-  }, []);
+  useEffect(
+    () => () => {
+      bridge.current?.close();
+      bridge.current = null;
+    },
+    []
+  );
 
   if (!links || !links.length) return null;
 
@@ -584,17 +620,7 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
                   <CastButton
                     link={activeLink}
                     resolveLink={() => {
-                      const frame = frameRef.current?.contentWindow as
-                        | (Window & {
-                            __seerrPlaybackSnapshot?: () => {
-                              itemId?: string;
-                              position: number;
-                              seasonNumber?: number;
-                              episodeNumber?: number;
-                            } | null;
-                          })
-                        | null;
-                      const snapshot = frame?.__seerrPlaybackSnapshot?.();
+                      const snapshot = latestSnapshot.current;
                       if (
                         !snapshot?.itemId ||
                         !/^[a-f0-9]{32}$/i.test(snapshot.itemId)
@@ -628,15 +654,7 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
                       };
                     }}
                     handoff={() => {
-                      const frame = frameRef.current?.contentWindow as
-                        | (Window & {
-                            __seerrPlaybackSnapshot?: () => {
-                              itemId?: string;
-                              position: number;
-                            } | null;
-                          })
-                        | null;
-                      const snapshot = frame?.__seerrPlaybackSnapshot?.();
+                      const snapshot = latestSnapshot.current;
                       const position = snapshot?.position;
                       return {
                         itemId: snapshot?.itemId,
@@ -696,7 +714,7 @@ const PlayButton = ({ links, prepareOnPage = false }: PlayButtonProps) => {
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={(event) => {
-                  startJellyfinPlayback(event.currentTarget);
+                  startJellyfinPlayback(event.currentTarget, true);
                 }}
               />
             </div>

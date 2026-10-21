@@ -95,10 +95,13 @@ export class PlayerBridge {
     return new Promise<PlayerSnapshot>((resolve, reject) => {
       if (this.closed) return reject(new Error('PLAYER_STOPPED'));
       const id = `${this.frameId}:${++this.sequence}`;
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error('PLAYER_COMMAND_TIMEOUT'));
-      }, action === 'play' ? 85_000 : 10_000);
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id);
+          reject(new Error('PLAYER_COMMAND_TIMEOUT'));
+        },
+        action === 'play' ? 85_000 : 10_000
+      );
       this.pending.set(id, { resolve, reject, timer });
       const dispatch = () => {
         if (!this.closed && this.pending.has(id))
@@ -113,13 +116,14 @@ export class PlayerBridge {
     return (this.playPromise ??= this.command('play', { resumeTicks }));
   }
 
-  close() {
+  close(sendStop = true) {
     if (this.closed) return;
-    this.send({
-      kind: 'command',
-      id: `${this.frameId}:stop:${++this.sequence}`,
-      action: 'stop',
-    });
+    if (sendStop)
+      this.send({
+        kind: 'command',
+        id: `${this.frameId}:stop:${++this.sequence}`,
+        action: 'stop',
+      });
     this.closed = true;
     clearTimeout(this.deadline);
     window.removeEventListener('message', this.receive);

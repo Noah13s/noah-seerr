@@ -66,3 +66,14 @@ test('commands receive matching failure acknowledgments', async () => {
   await assert.rejects(pending, /INVALID_TRACK/);
   f.bridge.close();
 });
+
+test('document replacement retires the endpoint without stopping the new document', async () => {
+  const f = fixture();
+  const pending = f.bridge.play();
+  const rejected = assert.rejects(pending, /PLAYER_STOPPED/);
+  f.bridge.close(false);
+  await rejected;
+  assert.equal(f.sent.filter(x => x.action === 'stop').length, 0);
+  f.send({ kind: 'event', event: 'ready' });
+  assert.equal(f.sent.filter(x => x.action === 'play').length, 0);
+});
