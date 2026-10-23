@@ -6,14 +6,17 @@ describe('profile history and planned list', () => {
       cy.viewport(width, 844);
       cy.setCookie('fixture-profile', '1');
       cy.visit('/watch-history');
-      cy.contains('Private history 1').should('be.visible');
+      const visibleRows = () =>
+        cy.get(width < 768 ? 'article:visible' : 'tbody tr:visible');
+      visibleRows().contains('Private history 1').should('be.visible');
       cy.contains('Private history 2').should('not.exist');
       cy.get('select').eq(1).find('option[value="anime"]').should('not.exist');
       cy.get('select').first().select('planned');
-      cy.contains('Future film 1').should('be.visible');
-      cy.contains('2027').should('be.visible');
+      visibleRows().contains('Future film 1').should('be.visible');
+      visibleRows().contains('2027').should('be.visible');
+      visibleRows().contains('7.5/10').should('be.visible');
       cy.get('select').eq(1).should('be.visible').select('movie');
-      cy.contains('Future film 1').should('be.visible');
+      visibleRows().contains('Future film 1').should('be.visible');
       cy.get('body').then((body) => {
         expect(body[0].scrollWidth).to.be.at.most(width + 1);
       });
@@ -22,7 +25,7 @@ describe('profile history and planned list', () => {
   it('switches ownership across fresh browser sessions and exposes opt-in anime', () => {
     cy.setCookie('fixture-profile', '2');
     cy.visit('/watch-history');
-    cy.contains('Private history 2').should('be.visible');
+    cy.contains('a:visible', 'Private history 2').should('be.visible');
     cy.contains('Private history 1').should('not.exist');
     cy.get('select').eq(1).find('option[value="anime"]').should('exist');
   });
