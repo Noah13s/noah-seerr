@@ -19,7 +19,7 @@ pnpm test
 pnpm build:server
 node -e "require('./dist/lib/native-playback-session.cjs')"
 pnpm build:next
-# Terminal 1; binds 127.0.0.1 only, uses ports 5055/5056:
+# Terminal 1; binds 127.0.0.1 only, uses port 5055:
 node scripts/browser-fixture.cjs
 # Terminal 2:
 pnpm exec cypress run --config-file cypress.fixture.config.ts --browser electron

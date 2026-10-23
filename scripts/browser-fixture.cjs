@@ -2,11 +2,10 @@
 // Loopback-only API double shared by Next SSR and the real browser. It cannot
 // connect to Seerr/Jellyfin/Arr and uses no production credentials or DB.
 const http = require('node:http');
-const next = require('node:child_process').spawn(
-  process.execPath,
-  ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', '5056'],
-  { stdio: 'inherit', env: { ...process.env, HOST: '127.0.0.1', PORT: '5055' } }
-);
+process.env.HOST = '127.0.0.1';
+process.env.PORT = '5055';
+const next = require('next')({ dev: false, hostname: '127.0.0.1', port: 5055 });
+const handleNext = next.getRequestHandler();
 const settings = {
   initialized: true,
   applicationTitle: 'Fixture Stream',
@@ -54,21 +53,7 @@ const page = (results) => ({
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1:5055');
   if (!url.pathname.startsWith('/api/')) {
-    const proxy = http.request(
-      {
-        host: '127.0.0.1',
-        port: 5056,
-        path: req.url,
-        method: req.method,
-        headers: req.headers,
-      },
-      (reply) => {
-        res.writeHead(reply.statusCode, reply.headers);
-        reply.pipe(res);
-      }
-    );
-    proxy.on('error', () => res.writeHead(503).end('Next fixture starting'));
-    req.pipe(proxy);
+    await handleNext(req, res);
     return;
   }
   const id = Number(
@@ -169,14 +154,14 @@ const server = http.createServer(async (req, res) => {
   if (path === '/settings/main') return send(settings);
   return send(page([]));
 });
-server.listen(5055, '127.0.0.1');
+next.prepare().then(() => server.listen(5055, '127.0.0.1')).catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+  server.close();
+});
 const stop = () => {
-  next.kill('SIGTERM');
+  next.close();
   server.close();
 };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
-next.on('exit', (code) => {
-  server.close();
-  process.exitCode = code || 0;
-});

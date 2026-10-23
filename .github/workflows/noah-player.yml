@@ -62,11 +62,11 @@ jobs:
           node scripts/browser-fixture.cjs > browser-fixture.log 2>&1 &
           fixture=$!
           trap 'kill "$fixture" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:5055/login > /dev/null; then break; fi
+          for attempt in $(seq 1 45); do
+            if curl --max-time 5 -fsS http://127.0.0.1:5055/login > /dev/null; then break; fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:5055/login > /dev/null
+          curl --max-time 5 -fsS http://127.0.0.1:5055/login > /dev/null
           pnpm exec cypress run --config-file cypress.fixture.config.ts --browser electron
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
