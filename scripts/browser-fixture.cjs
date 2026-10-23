@@ -72,7 +72,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/status')
     return send({
       version: 'fixture',
-      commitTag: 'fixture',
+      commitTag: require('node:fs').existsSync('committag.json') ? require('../committag.json').commitTag : 'local',
       updateAvailable: false,
     });
   if (path === '/auth/local' && req.method === 'POST') {

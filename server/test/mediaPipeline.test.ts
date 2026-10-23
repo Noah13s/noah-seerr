@@ -175,6 +175,9 @@ test('request → Arr download/import → available → approved deletion → an
       (await mediaRepo.findOneBy({ tmdbId: movie.id }))?.externalServiceId ===
       91
   );
+  // The scanner publishes the downloading phase; the detached Arr callback
+  // establishes the link before the subscriber's parent-state write settles.
+  await runWithMockTimers(() => radarrScanner.run());
   let media = await mediaRepo.findOneByOrFail({ tmdbId: movie.id });
   assert.equal(media.status, MediaStatus.PROCESSING);
   imported = true;
