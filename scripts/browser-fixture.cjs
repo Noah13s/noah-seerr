@@ -2,6 +2,7 @@
 // Loopback-only API double shared by Next SSR and the real browser. It cannot
 // connect to Seerr/Jellyfin/Arr and uses no production credentials or DB.
 const http = require('node:http');
+process.env.NODE_ENV = 'production';
 process.env.HOST = '127.0.0.1';
 process.env.PORT = '5055';
 const next = require('next')({ dev: false, hostname: '127.0.0.1', port: 5055 });
