@@ -30,6 +30,7 @@ import { isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import authRoutes from './auth';
 import blocklistRoutes from './blocklist';
+import cleanupReviewRoutes from './cleanupReviews';
 import collectionRoutes from './collection';
 import discoverRoutes, { createTmdbWithRegionLanguage } from './discover';
 import issueRoutes from './issue';
@@ -42,6 +43,7 @@ import searchRoutes from './search';
 import serviceRoutes from './service';
 import tvRoutes from './tv';
 import user from './user';
+import watchHistoryRoutes from './watchHistory';
 
 const router = Router();
 
@@ -158,6 +160,8 @@ router.use('/search', isAuthenticated(), searchRoutes);
 router.use('/discover', isAuthenticated(), discoverRoutes);
 router.use('/request', isAuthenticated(), requestRoutes);
 router.use('/watchlist', isAuthenticated(), watchlistRoutes);
+router.use('/watch-history', isAuthenticated(), watchHistoryRoutes);
+router.use('/cleanup-reviews', isAuthenticated(), cleanupReviewRoutes);
 router.use('/blocklist', isAuthenticated(), blocklistRoutes);
 router.use(
   '/blacklist',

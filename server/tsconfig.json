@@ -12,5 +12,5 @@
       "@server/*": ["*"]
     }
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "lib/native-playback-session.cjs"]
 }

@@ -101,6 +101,8 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
   configurable: true,
 });
 
+// Scanners use the lightweight scan endpoint; exercise its caller with the
+// same fixture data rather than silently reaching the external TMDB service.
 Object.defineProperty(TheMovieDb.prototype, 'getTvShowForScan', {
   get() {
     return async (args: { tvId: number; language?: string }) =>

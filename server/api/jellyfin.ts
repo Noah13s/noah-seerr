@@ -368,6 +368,21 @@ class JellyfinAPI extends ExternalAPI {
     }
   }
 
+  public async createUser(
+    name: string,
+    password: string
+  ): Promise<JellyfinUserResponse> {
+    if (!name.trim() || !password) {
+      throw new Error('A managed Jellyfin user requires a name and password');
+    }
+    // Jellyfin v12 accepts the initial password in the creation request. Never
+    // provision an account passwordless and depend on a second network call.
+    return this.post<JellyfinUserResponse>('/Users/New', {
+      Name: name,
+      Password: password,
+    });
+  }
+
   public async getUser(): Promise<JellyfinUserResponse> {
     try {
       const userReponse = await this.get<JellyfinUserResponse>(
