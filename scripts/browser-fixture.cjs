@@ -69,10 +69,13 @@ const server = http.createServer(async (req, res) => {
   };
   const path = url.pathname.replace('/api/v1', '');
   if (path === '/settings/public') return send(settings);
+  if (path === '/settings/discover') return send([]);
   if (path === '/status')
     return send({
       version: 'fixture',
-      commitTag: require('node:fs').existsSync('committag.json') ? require('../committag.json').commitTag : 'local',
+      commitTag: require('node:fs').existsSync('committag.json')
+        ? require('../committag.json').commitTag
+        : 'local',
       updateAvailable: false,
     });
   if (path === '/auth/local' && req.method === 'POST') {
@@ -107,7 +110,7 @@ const server = http.createServer(async (req, res) => {
           seasonProgress: {},
           episodeOverrides: {},
           viewingProgress: {},
-          rating: 8,
+          rating: 4,
         },
       ],
     });
@@ -155,11 +158,14 @@ const server = http.createServer(async (req, res) => {
   if (path === '/settings/main') return send(settings);
   return send(page([]));
 });
-next.prepare().then(() => server.listen(5055, '127.0.0.1')).catch(error => {
-  console.error(error);
-  process.exitCode = 1;
-  server.close();
-});
+next
+  .prepare()
+  .then(() => server.listen(5055, '127.0.0.1'))
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+    server.close();
+  });
 const stop = () => {
   next.close();
   server.close();
