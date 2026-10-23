@@ -53,3 +53,13 @@ Disposable patched Jellyfin, storage-pressure and Android emulator tests belong
 to the private Noah Stream integration repository. These jobs use generated
 media and test credentials. They do not establish physical TV/Cast/Safari,
 GPU tone mapping or long-run stability.
+
+## SonarQube Cloud
+
+`SonarCloud Code Analysis` supplements both test jobs. Its current automatic
+analysis reads repository source; it does not execute these tests or import
+coverage. A displayed zero/missing coverage value is not a measured result from
+this suite. See [Sonar's coverage documentation](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview/).
+Keep test/build and Sonar checks green for the exact PR commit before merging.
+The workflow runs on PR updates and `main`, avoiding duplicate branch-push runs;
+manual dispatch is available for a branch without a PR.
