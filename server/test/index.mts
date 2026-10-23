@@ -73,6 +73,8 @@ process.env.TS_NODE_FILES = 'true';
 
 const stream = run({
   files,
+  // Bound simultaneous TypeScript compiler/SQLite workers on hosted runners.
+  concurrency: 2,
   execArgv: [
     '--experimental-test-module-mocks',
     '-r',
@@ -88,6 +90,16 @@ const stream = run({
     join(BASE_DIR, 'server/migration/**'),
   ],
   testNamePatterns: opts.testNamePattern,
+});
+
+// run() reports child failures as events; piping a reporter alone exits zero.
+// Keep the process alive to drain every reporter, but fail the CI step.
+stream.on('test:fail', () => {
+  process.exitCode = 1;
+});
+stream.on('error', (error) => {
+  console.error(error);
+  process.exitCode = 1;
 });
 
 // In CI, write a JUnit report to a file for use by GitHub

@@ -52,6 +52,11 @@ export class UserSettings {
   @Column({ nullable: true })
   public originalLanguage?: string;
 
+  // The schema migration already creates this column. Keep the entity in sync
+  // so source builds and tests read the same preference as the deployed schema.
+  @Column({ default: true })
+  public showAnime: boolean;
+
   @Column({ nullable: true })
   public pgpKey?: string;
 

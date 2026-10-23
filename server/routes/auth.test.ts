@@ -631,6 +631,7 @@ describe('GET /auth/me', () => {
       'locale',
       'notificationTypes',
       'originalLanguage',
+      'showAnime',
       'streamingRegion',
       'watchlistSyncMovies',
       'watchlistSyncTv',

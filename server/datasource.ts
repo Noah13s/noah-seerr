@@ -1,4 +1,5 @@
 import { Blocklist } from '@server/entity/Blocklist';
+import { CleanupReview } from '@server/entity/CleanupReview';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
@@ -11,6 +12,7 @@ import { Session } from '@server/entity/Session';
 import { User } from '@server/entity/User';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { UserSettings } from '@server/entity/UserSettings';
+import { WatchHistory } from '@server/entity/WatchHistory';
 import { Watchlist } from '@server/entity/Watchlist';
 import { IssueCommentSubscriber } from '@server/subscriber/IssueCommentSubscriber';
 import { IssueSubscriber } from '@server/subscriber/IssueSubscriber';
@@ -26,6 +28,7 @@ const DB_SSL_PREFIX = 'DB_SSL_';
 
 const entities = [
   Blocklist,
+  CleanupReview,
   DiscoverSlider,
   Issue,
   IssueComment,
@@ -39,6 +42,7 @@ const entities = [
   UserPushSubscription,
   UserSettings,
   Watchlist,
+  WatchHistory,
 ];
 
 const subscribers = [

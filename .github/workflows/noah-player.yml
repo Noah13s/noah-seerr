@@ -6,6 +6,9 @@ on:
     branches: [main, 'codex/**']
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   bridge-and-build:
     runs-on: ubuntu-latest
@@ -21,7 +24,57 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: 0
       - run: pnpm typecheck:client
+      - run: pnpm typecheck:server
+      - run: node --test scripts/test-runner.test.cjs
+      - run: node --test scripts/native-playback-session.test.cjs
+      - run: pnpm test
+        env:
+          CI: true
+      - run: pnpm build:server
+      - run: node -e "require('./dist/lib/native-playback-session.cjs')"
       - run: pnpm build:next
         env:
           NEXT_TELEMETRY_DISABLED: 1
           NODE_OPTIONS: --max-old-space-size=4096
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: seerr-test-results-${{ github.sha }}
+          path: report.xml
+          if-no-files-found: ignore
+          retention-days: 14
+  browser-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.19.0
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:next
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_OPTIONS: --max-old-space-size=4096
+      - name: Start isolated SSR/API fixture and run browser journeys
+        run: |
+          node scripts/browser-fixture.cjs > browser-fixture.log 2>&1 &
+          fixture=$!
+          trap 'kill "$fixture" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:5055/login > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5055/login > /dev/null
+          pnpm exec cypress run --config-file cypress.fixture.config.ts --browser electron
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: seerr-browser-${{ github.sha }}
+          path: |
+            cypress/screenshots/
+            cypress/videos/
+            browser-fixture.log
+          if-no-files-found: ignore
+          retention-days: 14

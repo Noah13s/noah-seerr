@@ -1,2 +1,6 @@
 
-exec < /dev/tty && npx cz --hook || true
+# The prompt is useful in a terminal; scripted commits already supply -m/-F.
+# Keep lint-staged and commitlint enabled in both cases.
+if [ -t 0 ]; then
+  exec < /dev/tty && npx cz --hook || true
+fi

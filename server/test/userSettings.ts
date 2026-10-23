@@ -17,6 +17,7 @@ export const allowlistedSettings = {
   discoverRegion: 'DE',
   streamingRegion: 'DE',
   originalLanguage: 'de',
+  showAnime: false,
   watchlistSyncMovies: true,
   watchlistSyncTv: false,
 };
