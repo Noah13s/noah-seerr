@@ -107,6 +107,8 @@ const server = http.createServer(async (req, res) => {
           status: 'completed',
           watchCount: 1,
           watchedAt: '2026-01-01',
+          createdAt: '2026-01-01',
+          updatedAt: '2026-01-01',
           seasonProgress: {},
           episodeOverrides: {},
           viewingProgress: {},
@@ -131,6 +133,7 @@ const server = http.createServer(async (req, res) => {
     return send({
       [`movie:${900000 + id}`]: {
         average: 7.5,
+        votes: 100,
         isAnime: false,
         releaseDate: '2020-01-01',
       },
@@ -139,6 +142,7 @@ const server = http.createServer(async (req, res) => {
     return send({
       [`movie:${910000 + id}`]: {
         average: 7.5,
+        votes: 100,
         isAnime: false,
         releaseDate: '2027-01-01',
         upcoming: true,
