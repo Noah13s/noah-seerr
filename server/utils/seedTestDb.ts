@@ -1,6 +1,7 @@
 import { UserType } from '@server/constants/user';
 import dataSource, { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
+import bcrypt from 'bcrypt';
 import gravatarUrl from 'gravatar-url';
 
 export interface SeedDbOptions {
@@ -12,10 +13,9 @@ export interface SeedDbOptions {
   allowOutsideTest?: boolean;
 }
 
-// Precomputed bcrypt hash of 'test1234'. We precompute this to avoid
-// having to hash the password every time we seed the database.
-const TEST_USER_PASSWORD_HASH =
-  '$2b$12$Z5V2P5HZgmx4/AnWFMZN1.aD5AM1NucNi.mhNTSQ9oVtmdzu7Le/a';
+// Test/demo accounts intentionally use a known fixture password. Generate a
+// freshly salted hash per process instead of committing a reusable hash.
+let testPasswordHash: Promise<string> | undefined;
 
 function assertTestDatabase(operation: string, allowOutsideTest = false): void {
   if (allowOutsideTest || process.env.NODE_ENV === 'test') {
@@ -31,7 +31,10 @@ function assertTestDatabase(operation: string, allowOutsideTest = false): void {
  * Seeds test users into the database.
  * Assumes the database schema is already set up.
  */
-export async function seedTestUsers(): Promise<void> {
+export async function seedTestUsers(allowOutsideTest = false): Promise<void> {
+  assertTestDatabase('seed test users', allowOutsideTest);
+  testPasswordHash ??= bcrypt.hash('test1234', 12);
+  const passwordHash = await testPasswordHash;
   const userRepository = getRepository(User);
 
   const admin = await userRepository.findOne({
@@ -50,7 +53,7 @@ export async function seedTestUsers(): Promise<void> {
   user.username = 'admin';
   user.email = 'admin@seerr.dev';
   user.userType = UserType.PLEX;
-  user.password = TEST_USER_PASSWORD_HASH;
+  user.password = passwordHash;
   user.permissions = 2;
   user.avatar = gravatarUrl('admin@seerr.dev', { default: 'mm', size: 200 });
   await userRepository.save(user);
@@ -66,7 +69,7 @@ export async function seedTestUsers(): Promise<void> {
   otherUser.username = 'demo';
   otherUser.email = 'demo@seerr.dev';
   otherUser.userType = UserType.PLEX;
-  otherUser.password = TEST_USER_PASSWORD_HASH;
+  otherUser.password = passwordHash;
   otherUser.permissions = 32;
   otherUser.avatar = gravatarUrl('demo@seerr.dev', {
     default: 'mm',
@@ -96,7 +99,7 @@ export async function seedTestDb(options: SeedDbOptions = {}): Promise<void> {
     await dbConnection.synchronize();
   }
 
-  await seedTestUsers();
+  await seedTestUsers(options.allowOutsideTest);
 }
 
 /**

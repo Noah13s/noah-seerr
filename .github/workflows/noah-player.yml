@@ -44,6 +44,19 @@ jobs:
           path: report.xml
           if-no-files-found: ignore
           retention-days: 14
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build the production allowlist image
+        run: docker build --progress=plain --tag noah-seerr:ci .
+      - name: Start with isolated disposable configuration and verify runtime
+        run: |
+          docker run --detach --name seerr-container-ci --network none noah-seerr:ci
+          trap 'docker logs seerr-container-ci; docker rm --force seerr-container-ci' EXIT
+          docker cp scripts/check-runtime-image.mjs seerr-container-ci:/tmp/check-runtime-image.mjs
+          docker exec seerr-container-ci node /tmp/check-runtime-image.mjs
   browser-fixture:
     runs-on: ubuntu-latest
     timeout-minutes: 25

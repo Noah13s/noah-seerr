@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 
-import { resetTestDb, seedTestDb } from '@server/utils/seedTestDb';
+import {
+  resetTestDb,
+  seedTestDb,
+  seedTestUsers,
+} from '@server/utils/seedTestDb';
 
 // NODE_ENV is typed readonly, so it is swapped through the whole env object
 function setNodeEnv(value: string | undefined) {
@@ -25,5 +29,10 @@ describe('test database guard', () => {
     setNodeEnv('production');
 
     await assert.rejects(() => resetTestDb(), /Refusing to reset/);
+  });
+
+  it('refuses standalone known-password account seeding in production', async () => {
+    setNodeEnv('production');
+    await assert.rejects(() => seedTestUsers(), /Refusing to seed test users/);
   });
 });

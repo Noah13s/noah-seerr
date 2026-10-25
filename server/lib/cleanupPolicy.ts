@@ -70,9 +70,9 @@ export function assessManualCleanup(
       fingerprint: digest([
         'manual',
         key,
-        entries
-          .map((entry) => [entry.id, entry.requestedBy.id, entry.updatedAt])
-          .sort(),
+        [...entries]
+          .sort((a, b) => a.id - b.id)
+          .map((entry) => [entry.id, entry.requestedBy.id, entry.updatedAt]),
         first.media.status,
         first.media.status4k,
         first.media.seasons
@@ -150,7 +150,7 @@ export async function assessCleanup(
         request.requestedBy,
       ])
     );
-    const revisions: unknown[] = [];
+    const revisions: [number, ...unknown[]][] = [];
     let latest = 0;
     let title = '';
     let ready = true;
@@ -236,7 +236,7 @@ export async function assessCleanup(
         group.season ? history.seasonProgress?.[String(group.season)] : null,
         Object.entries(history.episodeOverrides ?? {})
           .filter(([episode]) => episode.startsWith(`${group.season}:`))
-          .sort(),
+          .sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true })),
       ]);
     }
     if (!ready || !latest) continue;
@@ -266,16 +266,16 @@ export async function assessCleanup(
       eligible: new Date(eligibleAt).getTime() <= now,
       fingerprint: digest([
         key,
-        revisions.sort(),
-        group.requests
+        revisions.sort(([a], [b]) => a - b),
+        [...group.requests]
+          .sort((a, b) => a.id - b.id)
           .map((request) => [
             request.id,
             request.requestedBy.id,
             request.status,
             request.is4k,
             request.updatedAt,
-          ])
-          .sort(),
+          ]),
       ]),
     });
   }

@@ -29,7 +29,7 @@ import discoverSettingRoutes from '@server/routes/settings/discover';
 import { ApiError } from '@server/types/error';
 import { appDataPath } from '@server/utils/appDataVolume';
 import { getAppVersion } from '@server/utils/appVersion';
-import { dnsCache } from '@server/utils/dnsCache';
+import { getDnsCache } from '@server/utils/dnsCache';
 import { getHostname } from '@server/utils/getHostname';
 import type { DnsEntries, DnsStats } from 'dns-caching';
 import { Router } from 'express';
@@ -824,6 +824,7 @@ settingsRoutes.get('/cache', async (_req, res) => {
   const tmdbImageCache = await ImageProxy.getImageStats('tmdb');
   const avatarImageCache = await ImageProxy.getImageStats('avatar');
 
+  const dnsCache = getDnsCache();
   const stats: DnsStats | undefined = dnsCache?.getStats();
   const entries: DnsEntries | undefined = dnsCache?.getCacheEntries();
 
@@ -858,6 +859,7 @@ settingsRoutes.post<{ dnsEntry: string }>(
   '/cache/dns/:dnsEntry/flush',
   (req, res, next) => {
     const dnsEntry = req.params.dnsEntry;
+    const dnsCache = getDnsCache();
 
     if (dnsCache) {
       dnsCache.clear(dnsEntry);

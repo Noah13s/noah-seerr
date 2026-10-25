@@ -7,8 +7,13 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-COPY . ./app
 WORKDIR /app
+COPY package.json pnpm-lock.yaml .npmrc ./
+COPY next.config.ts postcss.config.js tailwind.config.js tsconfig.json seerr-api.yml ./
+COPY bin ./bin
+COPY public ./public
+COPY src ./src
+COPY server ./server
 
 FROM base AS prod-deps
 
@@ -56,18 +61,20 @@ ARG COMMIT_TAG
 ENV NODE_ENV=production
 ENV COMMIT_TAG=${COMMIT_TAG}
 
-RUN apk add --no-cache tzdata
+RUN apk add --no-cache tzdata && \
+  mkdir -p /app/config && chown node:node /app /app/config
 
 USER node:node
 
 WORKDIR /app
 
-COPY --chown=node:node . .
+COPY --chown=node:node package.json next.config.ts seerr-api.yml ./
+COPY --chown=node:node public ./public
 COPY --chown=node:node --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/.next ./.next
 COPY --chown=node:node --from=build /app/dist ./dist
 
-RUN touch config/DOCKER && \
+RUN mkdir -p config && touch config/DOCKER && \
   echo "{\"commitTag\": \"${COMMIT_TAG}\"}" > committag.json
 
 EXPOSE 5055

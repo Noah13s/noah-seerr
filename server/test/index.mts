@@ -62,7 +62,7 @@ if (positionals.length > 0) {
   for await (const entry of glob(join(BASE_DIR, 'src/**/*.test.ts'))) {
     files.push(resolve(entry));
   }
-  files.sort();
+  files.sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 // @ts-ignore
