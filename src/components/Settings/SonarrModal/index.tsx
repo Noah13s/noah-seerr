@@ -1,5 +1,11 @@
 import Modal from '@app/components/Common/Modal';
-import SensitiveInput from '@app/components/Common/SensitiveInput';
+import {
+  ArrConnectionFields,
+  ArrSelectField,
+  ArrServiceOptions,
+  ArrTagsField,
+  arrProfileOptions,
+} from '@app/components/Settings/ArrFormFields';
 import type { SonarrTestResponse } from '@app/components/Settings/SettingsServices';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -11,14 +17,7 @@ import axios from 'axios';
 import { Field, Formik } from 'formik';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { OnChangeValue } from 'react-select';
-import Select from 'react-select';
 import * as Yup from 'yup';
-
-type OptionType = {
-  value: number;
-  label: string;
-};
 
 const messages = defineMessages('components.Settings.SonarrModal', {
   createsonarr: 'Add New Sonarr Server',
@@ -112,6 +111,18 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
     languageProfiles: null,
     tags: [],
   });
+
+  const profileOptions = arrProfileOptions(testResponse.profiles, intl.locale);
+  const rootFolderOptions = testResponse.rootFolders.map((folder) => ({
+    value: folder.path,
+    label: folder.path,
+  }));
+
+  const languageProfileOptions =
+    testResponse.languageProfiles?.map((language) => ({
+      value: language.id,
+      label: language.name,
+    })) ?? [];
 
   const SonarrSettingsSchema = Yup.object().shape({
     name: Yup.string().required(
@@ -384,181 +395,10 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
               }
             >
               <div className="mb-6">
-                <div className="form-row">
-                  <label htmlFor="isDefault" className="checkbox-label">
-                    {intl.formatMessage(
-                      values.is4k
-                        ? messages.default4kserver
-                        : messages.defaultserver
-                    )}
-                  </label>
-                  <div className="form-input-area">
-                    <Field type="checkbox" id="isDefault" name="isDefault" />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="is4k" className="checkbox-label">
-                    {intl.formatMessage(messages.server4k)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.server4kHelp)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <Field type="checkbox" id="is4k" name="is4k" />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="name" className="text-label">
-                    {intl.formatMessage(messages.servername)}
-                    <span className="label-required">*</span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        id="name"
-                        name="name"
-                        type="text"
-                        autoComplete="off"
-                        data-form-type="other"
-                        data-1pignore="true"
-                        data-lpignore="true"
-                        data-bwignore="true"
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          setIsValidated(false);
-                          setFieldValue('name', e.target.value);
-                        }}
-                      />
-                    </div>
-                    {errors.name &&
-                      touched.name &&
-                      typeof errors.name === 'string' && (
-                        <div className="error">{errors.name}</div>
-                      )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="hostname" className="text-label">
-                    {intl.formatMessage(messages.hostname)}
-                    <span className="label-required">*</span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <span className="protocol">
-                        {values.ssl ? 'https://' : 'http://'}
-                      </span>
-                      <Field
-                        id="hostname"
-                        name="hostname"
-                        type="text"
-                        inputMode="url"
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          setIsValidated(false);
-                          setFieldValue('hostname', e.target.value);
-                        }}
-                        className="rounded-r-only"
-                      />
-                    </div>
-                    {errors.hostname &&
-                      touched.hostname &&
-                      typeof errors.hostname === 'string' && (
-                        <div className="error">{errors.hostname}</div>
-                      )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="port" className="text-label">
-                    {intl.formatMessage(messages.port)}
-                    <span className="label-required">*</span>
-                  </label>
-                  <div className="form-input-area">
-                    <Field
-                      id="port"
-                      name="port"
-                      type="text"
-                      inputMode="numeric"
-                      className="short"
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        setIsValidated(false);
-                        setFieldValue('port', e.target.value);
-                      }}
-                    />
-                    {errors.port &&
-                      touched.port &&
-                      typeof errors.port === 'string' && (
-                        <div className="error">{errors.port}</div>
-                      )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="ssl" className="checkbox-label">
-                    {intl.formatMessage(messages.ssl)}
-                  </label>
-                  <div className="form-input-area">
-                    <Field
-                      type="checkbox"
-                      id="ssl"
-                      name="ssl"
-                      onChange={() => {
-                        setIsValidated(false);
-                        setFieldValue('ssl', !values.ssl);
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="apiKey" className="text-label">
-                    {intl.formatMessage(messages.apiKey)}
-                    <span className="label-required">*</span>
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.apiKeyHelp)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <SensitiveInput
-                        as="field"
-                        id="apiKey"
-                        name="apiKey"
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          setIsValidated(false);
-                          setFieldValue('apiKey', e.target.value);
-                        }}
-                      />
-                    </div>
-                    {errors.apiKey &&
-                      touched.apiKey &&
-                      typeof errors.apiKey === 'string' && (
-                        <div className="error">{errors.apiKey}</div>
-                      )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="baseUrl" className="text-label">
-                    {intl.formatMessage(messages.baseUrl)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.baseUrlHelp)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        id="baseUrl"
-                        name="baseUrl"
-                        type="text"
-                        inputMode="url"
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          setIsValidated(false);
-                          setFieldValue('baseUrl', e.target.value);
-                        }}
-                      />
-                    </div>
-                    {errors.baseUrl &&
-                      touched.baseUrl &&
-                      typeof errors.baseUrl === 'string' && (
-                        <div className="error">{errors.baseUrl}</div>
-                      )}
-                  </div>
-                </div>
+                <ArrConnectionFields
+                  messages={messages}
+                  onConnectionEdit={() => setIsValidated(false)}
+                />
                 <div className="form-row">
                   <label htmlFor="seriesType" className="text-label">
                     {intl.formatMessage(messages.seriesType)}
@@ -580,205 +420,66 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                     <div className="error">{errors.seriesType}</div>
                   )}
                 </div>
-                <div className="form-row">
-                  <label htmlFor="activeProfileId" className="text-label">
-                    {intl.formatMessage(messages.qualityprofile)}
-                    <span className="label-required">*</span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        as="select"
-                        id="activeProfileId"
-                        name="activeProfileId"
-                        disabled={!isValidated || isTesting}
-                      >
-                        <option value="">
-                          {isTesting
-                            ? intl.formatMessage(messages.loadingprofiles)
-                            : !isValidated
-                              ? intl.formatMessage(
-                                  messages.testFirstQualityProfiles
-                                )
-                              : intl.formatMessage(
-                                  messages.selectQualityProfile
-                                )}
-                        </option>
-                        {testResponse.profiles.length > 0 &&
-                          testResponse.profiles
-                            .toSorted((a, b) =>
-                              a.name.localeCompare(b.name, intl.locale, {
-                                numeric: true,
-                                sensitivity: 'base',
-                              })
-                            )
-                            .map((profile) => (
-                              <option
-                                key={`loaded-profile-${profile.id}`}
-                                value={profile.id}
-                              >
-                                {profile.name}
-                              </option>
-                            ))}
-                      </Field>
-                    </div>
-                    {errors.activeProfileId &&
-                      touched.activeProfileId &&
-                      typeof errors.activeProfileId === 'string' && (
-                        <div className="error">{errors.activeProfileId}</div>
-                      )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="rootFolder" className="text-label">
-                    {intl.formatMessage(messages.rootfolder)}
-                    <span className="label-required">*</span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        as="select"
-                        id="rootFolder"
-                        name="rootFolder"
-                        disabled={!isValidated || isTesting}
-                      >
-                        <option value="">
-                          {isTesting
-                            ? intl.formatMessage(messages.loadingrootfolders)
-                            : !isValidated
-                              ? intl.formatMessage(
-                                  messages.testFirstRootFolders
-                                )
-                              : intl.formatMessage(messages.selectRootFolder)}
-                        </option>
-                        {testResponse.rootFolders.length > 0 &&
-                          testResponse.rootFolders.map((folder) => (
-                            <option
-                              key={`loaded-profile-${folder.id}`}
-                              value={folder.path}
-                            >
-                              {folder.path}
-                            </option>
-                          ))}
-                      </Field>
-                    </div>
-                    {errors.rootFolder &&
-                      touched.rootFolder &&
-                      typeof errors.rootFolder === 'string' && (
-                        <div className="error">{errors.rootFolder}</div>
-                      )}
-                  </div>
-                </div>
+                <ArrSelectField
+                  name="activeProfileId"
+                  label={intl.formatMessage(messages.qualityprofile)}
+                  required={true}
+                  disabled={!isValidated || isTesting}
+                  options={profileOptions}
+                  placeholder={intl.formatMessage(
+                    isTesting
+                      ? messages.loadingprofiles
+                      : !isValidated
+                        ? messages.testFirstQualityProfiles
+                        : messages.selectQualityProfile
+                  )}
+                />
+                <ArrSelectField
+                  name="rootFolder"
+                  label={intl.formatMessage(messages.rootfolder)}
+                  required={true}
+                  disabled={!isValidated || isTesting}
+                  options={rootFolderOptions}
+                  placeholder={intl.formatMessage(
+                    isTesting
+                      ? messages.loadingrootfolders
+                      : !isValidated
+                        ? messages.testFirstRootFolders
+                        : messages.selectRootFolder
+                  )}
+                />
                 {testResponse.languageProfiles && (
-                  <div className="form-row">
-                    <label
-                      htmlFor="activeLanguageProfileId"
-                      className="text-label"
-                    >
-                      {intl.formatMessage(messages.languageprofile)}
-                      <span className="label-required">*</span>
-                    </label>
-                    <div className="form-input-area">
-                      <div className="form-input-field">
-                        <Field
-                          as="select"
-                          id="activeLanguageProfileId"
-                          name="activeLanguageProfileId"
-                          disabled={!isValidated || isTesting}
-                        >
-                          <option value="">
-                            {isTesting
-                              ? intl.formatMessage(
-                                  messages.loadinglanguageprofiles
-                                )
-                              : !isValidated
-                                ? intl.formatMessage(
-                                    messages.testFirstLanguageProfiles
-                                  )
-                                : intl.formatMessage(
-                                    messages.selectLanguageProfile
-                                  )}
-                          </option>
-                          {testResponse.languageProfiles.length > 0 &&
-                            testResponse.languageProfiles.map((language) => (
-                              <option
-                                key={`loaded-profile-${language.id}`}
-                                value={language.id}
-                              >
-                                {language.name}
-                              </option>
-                            ))}
-                        </Field>
-                      </div>
-                      {errors.activeLanguageProfileId &&
-                        touched.activeLanguageProfileId && (
-                          <div className="error">
-                            {errors.activeLanguageProfileId}
-                          </div>
-                        )}
-                    </div>
-                  </div>
+                  <ArrSelectField
+                    name="activeLanguageProfileId"
+                    label={intl.formatMessage(messages.languageprofile)}
+                    required={true}
+                    disabled={!isValidated || isTesting}
+                    options={languageProfileOptions}
+                    placeholder={intl.formatMessage(
+                      isTesting
+                        ? messages.loadinglanguageprofiles
+                        : !isValidated
+                          ? messages.testFirstLanguageProfiles
+                          : messages.selectLanguageProfile
+                    )}
+                  />
                 )}
-                <div className="form-row">
-                  <label htmlFor="tags" className="text-label">
-                    {intl.formatMessage(messages.tags)}
-                  </label>
-                  <div className="form-input-area">
-                    <Select<OptionType, true>
-                      options={
-                        isValidated
-                          ? testResponse.tags.map((tag) => ({
-                              label: tag.label,
-                              value: tag.id,
-                            }))
-                          : []
-                      }
-                      isMulti
-                      isDisabled={!isValidated || isTesting}
-                      placeholder={
-                        !isValidated
-                          ? intl.formatMessage(messages.testFirstTags)
-                          : isTesting
-                            ? intl.formatMessage(messages.loadingTags)
-                            : intl.formatMessage(messages.selecttags)
-                      }
-                      isLoading={isTesting}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      value={
-                        isTesting
-                          ? []
-                          : (values.tags
-                              .map((tagId) => {
-                                const foundTag = testResponse.tags.find(
-                                  (tag) => tag.id === tagId
-                                );
-
-                                if (!foundTag) {
-                                  return undefined;
-                                }
-
-                                return {
-                                  value: foundTag.id,
-                                  label: foundTag.label,
-                                };
-                              })
-                              .filter(
-                                (option) => option !== undefined
-                              ) as OptionType[])
-                      }
-                      onChange={(value: OnChangeValue<OptionType, true>) => {
-                        setFieldValue(
-                          'tags',
-                          value.map((option) => option.value)
-                        );
-                      }}
-                      noOptionsMessage={() =>
-                        intl.formatMessage(messages.notagoptions)
-                      }
-                    />
-                  </div>
-                </div>
+                <ArrTagsField
+                  name="tags"
+                  label={intl.formatMessage(messages.tags)}
+                  tags={isValidated ? testResponse.tags : []}
+                  disabled={!isValidated}
+                  loading={isTesting}
+                  hideSelectionWhileLoading={true}
+                  placeholder={intl.formatMessage(
+                    !isValidated
+                      ? messages.testFirstTags
+                      : isTesting
+                        ? messages.loadingTags
+                        : messages.selecttags
+                  )}
+                  noOptionsLabel={intl.formatMessage(messages.notagoptions)}
+                />
                 <div className="form-row">
                   <label htmlFor="animeSeriesType" className="text-label">
                     {intl.formatMessage(messages.animeSeriesType)}
@@ -800,202 +501,66 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                     <div className="error">{errors.animeSeriesType}</div>
                   )}
                 </div>
-                <div className="form-row">
-                  <label htmlFor="activeAnimeProfileId" className="text-label">
-                    {intl.formatMessage(messages.animequalityprofile)}
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        as="select"
-                        id="activeAnimeProfileId"
-                        name="activeAnimeProfileId"
-                        disabled={!isValidated || isTesting}
-                      >
-                        <option value="">
-                          {isTesting
-                            ? intl.formatMessage(messages.loadingprofiles)
-                            : !isValidated
-                              ? intl.formatMessage(
-                                  messages.testFirstQualityProfiles
-                                )
-                              : intl.formatMessage(
-                                  messages.selectQualityProfile
-                                )}
-                        </option>
-                        {testResponse.profiles.length > 0 &&
-                          testResponse.profiles
-                            .toSorted((a, b) =>
-                              a.name.localeCompare(b.name, intl.locale, {
-                                numeric: true,
-                                sensitivity: 'base',
-                              })
-                            )
-                            .map((profile) => (
-                              <option
-                                key={`loaded-profile-anime-${profile.id}`}
-                                value={profile.id}
-                              >
-                                {profile.name}
-                              </option>
-                            ))}
-                      </Field>
-                    </div>
-                    {errors.activeAnimeProfileId &&
-                      touched.activeAnimeProfileId && (
-                        <div className="error">
-                          {errors.activeAnimeProfileId}
-                        </div>
-                      )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="activeAnimeRootFolder" className="text-label">
-                    {intl.formatMessage(messages.animerootfolder)}
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        as="select"
-                        id="activeAnimeRootFolder"
-                        name="activeAnimeRootFolder"
-                        disabled={!isValidated || isTesting}
-                      >
-                        <option value="">
-                          {isTesting
-                            ? intl.formatMessage(messages.loadingrootfolders)
-                            : !isValidated
-                              ? intl.formatMessage(
-                                  messages.testFirstRootFolders
-                                )
-                              : intl.formatMessage(messages.selectRootFolder)}
-                        </option>
-                        {testResponse.rootFolders.length > 0 &&
-                          testResponse.rootFolders.map((folder) => (
-                            <option
-                              key={`loaded-profile-${folder.id}`}
-                              value={folder.path}
-                            >
-                              {folder.path}
-                            </option>
-                          ))}
-                      </Field>
-                    </div>
-                    {errors.activeAnimeRootFolder &&
-                      touched.activeAnimeRootFolder && (
-                        <div className="error">{errors.rootFolder}</div>
-                      )}
-                  </div>
-                </div>
+                <ArrSelectField
+                  name="activeAnimeProfileId"
+                  label={intl.formatMessage(messages.animequalityprofile)}
+                  required={false}
+                  disabled={!isValidated || isTesting}
+                  options={profileOptions}
+                  placeholder={intl.formatMessage(
+                    isTesting
+                      ? messages.loadingprofiles
+                      : !isValidated
+                        ? messages.testFirstQualityProfiles
+                        : messages.selectQualityProfile
+                  )}
+                />
+                <ArrSelectField
+                  name="activeAnimeRootFolder"
+                  label={intl.formatMessage(messages.animerootfolder)}
+                  required={false}
+                  disabled={!isValidated || isTesting}
+                  options={rootFolderOptions}
+                  placeholder={intl.formatMessage(
+                    isTesting
+                      ? messages.loadingrootfolders
+                      : !isValidated
+                        ? messages.testFirstRootFolders
+                        : messages.selectRootFolder
+                  )}
+                />
                 {testResponse.languageProfiles && (
-                  <div className="form-row">
-                    <label
-                      htmlFor="activeAnimeLanguageProfileId"
-                      className="text-label"
-                    >
-                      {intl.formatMessage(messages.animelanguageprofile)}
-                    </label>
-                    <div className="form-input-area">
-                      <div className="form-input-field">
-                        <Field
-                          as="select"
-                          id="activeAnimeLanguageProfileId"
-                          name="activeAnimeLanguageProfileId"
-                          disabled={!isValidated || isTesting}
-                        >
-                          <option value="">
-                            {isTesting
-                              ? intl.formatMessage(
-                                  messages.loadinglanguageprofiles
-                                )
-                              : !isValidated
-                                ? intl.formatMessage(
-                                    messages.testFirstLanguageProfiles
-                                  )
-                                : intl.formatMessage(
-                                    messages.selectLanguageProfile
-                                  )}
-                          </option>
-                          {testResponse.languageProfiles.length > 0 &&
-                            testResponse.languageProfiles.map((language) => (
-                              <option
-                                key={`loaded-profile-${language.id}`}
-                                value={language.id}
-                              >
-                                {language.name}
-                              </option>
-                            ))}
-                        </Field>
-                      </div>
-                      {errors.activeAnimeLanguageProfileId &&
-                        touched.activeAnimeLanguageProfileId && (
-                          <div className="error">
-                            {errors.activeAnimeLanguageProfileId}
-                          </div>
-                        )}
-                    </div>
-                  </div>
+                  <ArrSelectField
+                    name="activeAnimeLanguageProfileId"
+                    label={intl.formatMessage(messages.animelanguageprofile)}
+                    required={false}
+                    disabled={!isValidated || isTesting}
+                    options={languageProfileOptions}
+                    placeholder={intl.formatMessage(
+                      isTesting
+                        ? messages.loadinglanguageprofiles
+                        : !isValidated
+                          ? messages.testFirstLanguageProfiles
+                          : messages.selectLanguageProfile
+                    )}
+                  />
                 )}
-                <div className="form-row">
-                  <label htmlFor="tags" className="text-label">
-                    {intl.formatMessage(messages.animeTags)}
-                  </label>
-                  <div className="form-input-area">
-                    <Select<OptionType, true>
-                      options={
-                        isValidated
-                          ? testResponse.tags.map((tag) => ({
-                              label: tag.label,
-                              value: tag.id,
-                            }))
-                          : []
-                      }
-                      isMulti
-                      isDisabled={!isValidated}
-                      placeholder={
-                        !isValidated
-                          ? intl.formatMessage(messages.testFirstTags)
-                          : isTesting
-                            ? intl.formatMessage(messages.loadingTags)
-                            : intl.formatMessage(messages.selecttags)
-                      }
-                      isLoading={isTesting}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      value={
-                        isTesting
-                          ? []
-                          : (values.animeTags
-                              .map((tagId) => {
-                                const foundTag = testResponse.tags.find(
-                                  (tag) => tag.id === tagId
-                                );
-
-                                if (!foundTag) {
-                                  return undefined;
-                                }
-
-                                return {
-                                  value: foundTag.id,
-                                  label: foundTag.label,
-                                };
-                              })
-                              .filter(
-                                (option) => option !== undefined
-                              ) as OptionType[])
-                      }
-                      onChange={(value) => {
-                        setFieldValue(
-                          'animeTags',
-                          value.map((option) => option.value)
-                        );
-                      }}
-                      noOptionsMessage={() =>
-                        intl.formatMessage(messages.notagoptions)
-                      }
-                    />
-                  </div>
-                </div>
+                <ArrTagsField
+                  name="animeTags"
+                  label={intl.formatMessage(messages.animeTags)}
+                  tags={isValidated ? testResponse.tags : []}
+                  disabled={!isValidated}
+                  loading={isTesting}
+                  hideSelectionWhileLoading={true}
+                  placeholder={intl.formatMessage(
+                    !isValidated
+                      ? messages.testFirstTags
+                      : isTesting
+                        ? messages.loadingTags
+                        : messages.selecttags
+                  )}
+                  noOptionsLabel={intl.formatMessage(messages.notagoptions)}
+                />
                 <div className="form-row">
                   <label
                     htmlFor="enableSeasonFolders"
@@ -1035,74 +600,7 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                     <div className="error">{errors.monitorNewItems}</div>
                   )}
                 </div>
-                <div className="form-row">
-                  <label htmlFor="externalUrl" className="text-label">
-                    {intl.formatMessage(messages.externalUrl)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.externalUrlHelp)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        id="externalUrl"
-                        name="externalUrl"
-                        type="text"
-                        inputMode="url"
-                      />
-                    </div>
-                    {errors.externalUrl &&
-                      touched.externalUrl &&
-                      typeof errors.externalUrl === 'string' && (
-                        <div className="error">{errors.externalUrl}</div>
-                      )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="syncEnabled" className="checkbox-label">
-                    {intl.formatMessage(messages.syncEnabled)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.syncEnabledHelp)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <Field
-                      type="checkbox"
-                      id="syncEnabled"
-                      name="syncEnabled"
-                    />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="enableSearch" className="checkbox-label">
-                    {intl.formatMessage(messages.enableSearch)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.enableSearchHelp)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <Field
-                      type="checkbox"
-                      id="enableSearch"
-                      name="enableSearch"
-                    />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="tagRequests" className="checkbox-label">
-                    {intl.formatMessage(messages.tagRequests)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.tagRequestsInfo)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <Field
-                      type="checkbox"
-                      id="tagRequests"
-                      name="tagRequests"
-                    />
-                  </div>
-                </div>
+                <ArrServiceOptions messages={messages} />
               </div>
             </Modal>
           );
