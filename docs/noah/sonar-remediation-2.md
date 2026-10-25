@@ -14,7 +14,7 @@ percentage require analysis of an approved commit; these are not local results.
 standard/anime tags and common service options. The Radarr and Sonarr modals
 retain their own messages, schema, submissions and media-specific settings.
 
-The two forms and shared implementation total 439 fewer source lines than the
+The two forms and shared implementation total 424 fewer source lines than the
 original two forms. This is a source-size comparison, not an estimate of Sonar's
 CPD algorithm. Existing label IDs, password masking, localized descriptors and
 profile ordering are preserved. Standard and anime tags now have distinct
@@ -39,7 +39,7 @@ was added to the tests.
 ### Verification
 
 - Full suite: 286 passed before the final tag/language-selector extraction.
-- Final focused suite: eight passed, including saved field values/password
+- Final focused suite: nine passed, including saved field values/password
   masking, optional anime paths, independent tag selections, failure/retry
   behavior and asynchronous download completion.
 - Test-runner regression cases: two passed. A dedicated test tsconfig supports

@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { IntlProvider } from 'react-intl';
 import {
   ArrConnectionFields,
+  ArrLibraryFields,
   ArrSelectField,
   ArrServiceOptions,
   ArrTagsField,
@@ -14,6 +15,14 @@ import {
 
 const messages = Object.fromEntries(
   [
+    'qualityprofile',
+    'rootfolder',
+    'loadingprofiles',
+    'testFirstQualityProfiles',
+    'selectQualityProfile',
+    'loadingrootfolders',
+    'testFirstRootFolders',
+    'selectRootFolder',
     'apiKey',
     'apiKeyHelp',
     'baseUrl',
@@ -176,4 +185,32 @@ test('standard and anime tags retain separate accessible inputs and selections',
   assert.match(html, /id="animeTags"/);
   assert.match(html, /name="tags"[^>]*value="1"/);
   assert.match(html, /name="animeTags"[^>]*value="2"/);
+});
+
+test('standard library selectors share validation/loading state and retain saved choices', () => {
+  for (const loading of [false, true]) {
+    const html = renderToStaticMarkup(
+      createElement(
+        IntlProvider,
+        { locale: 'en' },
+        createElement(
+          Formik,
+          {
+            initialValues: { activeProfileId: 2, rootFolder: '/media' },
+            onSubmit: () => {},
+          },
+          createElement(ArrLibraryFields, {
+            messages,
+            validated: true,
+            loading,
+            profileOptions: [{ value: 2, label: 'Profile 2' }],
+            rootFolderOptions: [{ value: '/media', label: '/media' }],
+          })
+        )
+      )
+    );
+    assert.match(html, /value="2" selected=""/);
+    assert.match(html, /value="\/media" selected=""/);
+    assert.equal((html.match(/disabled=""/g) ?? []).length, loading ? 2 : 0);
+  }
 });

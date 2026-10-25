@@ -1,6 +1,7 @@
 import Modal from '@app/components/Common/Modal';
 import {
   ArrConnectionFields,
+  ArrLibraryFields,
   ArrSelectField,
   ArrServiceOptions,
   ArrTagsField,
@@ -420,33 +421,12 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                     <div className="error">{errors.seriesType}</div>
                   )}
                 </div>
-                <ArrSelectField
-                  name="activeProfileId"
-                  label={intl.formatMessage(messages.qualityprofile)}
-                  required={true}
-                  disabled={!isValidated || isTesting}
-                  options={profileOptions}
-                  placeholder={intl.formatMessage(
-                    isTesting
-                      ? messages.loadingprofiles
-                      : !isValidated
-                        ? messages.testFirstQualityProfiles
-                        : messages.selectQualityProfile
-                  )}
-                />
-                <ArrSelectField
-                  name="rootFolder"
-                  label={intl.formatMessage(messages.rootfolder)}
-                  required={true}
-                  disabled={!isValidated || isTesting}
-                  options={rootFolderOptions}
-                  placeholder={intl.formatMessage(
-                    isTesting
-                      ? messages.loadingrootfolders
-                      : !isValidated
-                        ? messages.testFirstRootFolders
-                        : messages.selectRootFolder
-                  )}
+                <ArrLibraryFields
+                  messages={messages}
+                  profileOptions={profileOptions}
+                  rootFolderOptions={rootFolderOptions}
+                  validated={isValidated}
+                  loading={isTesting}
                 />
                 {testResponse.languageProfiles && (
                   <ArrSelectField

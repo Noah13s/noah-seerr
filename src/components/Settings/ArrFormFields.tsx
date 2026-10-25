@@ -24,6 +24,14 @@ interface ArrFormValues {
 }
 
 type ArrMessages = Record<
+  | 'qualityprofile'
+  | 'rootfolder'
+  | 'loadingprofiles'
+  | 'testFirstQualityProfiles'
+  | 'selectQualityProfile'
+  | 'loadingrootfolders'
+  | 'testFirstRootFolders'
+  | 'selectRootFolder'
   | 'apiKey'
   | 'apiKeyHelp'
   | 'baseUrl'
@@ -393,5 +401,53 @@ export function ArrTagsField({
         {meta.error && <div className="error">{meta.error}</div>}
       </div>
     </div>
+  );
+}
+
+export function ArrLibraryFields({
+  messages,
+  profileOptions,
+  rootFolderOptions,
+  validated,
+  loading,
+}: {
+  messages: ArrMessages;
+  profileOptions: readonly { value: number | string; label: string }[];
+  rootFolderOptions: readonly { value: number | string; label: string }[];
+  validated: boolean;
+  loading: boolean;
+}) {
+  const intl = useIntl();
+  return (
+    <>
+      <ArrSelectField
+        name="activeProfileId"
+        label={intl.formatMessage(messages.qualityprofile)}
+        required
+        disabled={!validated || loading}
+        options={profileOptions}
+        placeholder={intl.formatMessage(
+          loading
+            ? messages.loadingprofiles
+            : !validated
+              ? messages.testFirstQualityProfiles
+              : messages.selectQualityProfile
+        )}
+      />
+      <ArrSelectField
+        name="rootFolder"
+        label={intl.formatMessage(messages.rootfolder)}
+        required
+        disabled={!validated || loading}
+        options={rootFolderOptions}
+        placeholder={intl.formatMessage(
+          loading
+            ? messages.loadingrootfolders
+            : !validated
+              ? messages.testFirstRootFolders
+              : messages.selectRootFolder
+        )}
+      />
+    </>
   );
 }
