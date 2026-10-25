@@ -65,10 +65,9 @@ if (positionals.length > 0) {
   files.sort((a, b) => a.localeCompare(b, 'en'));
 }
 
-// @ts-ignore
-process.env.NODE_ENV = 'test';
+Object.assign(process.env, { NODE_ENV: 'test' });
 // configure ts
-process.env.TS_NODE_PROJECT = resolveImport('../tsconfig.json');
+process.env.TS_NODE_PROJECT = resolveImport('./tsconfig.json');
 process.env.TS_NODE_FILES = 'true';
 
 const stream = run({
@@ -98,7 +97,9 @@ stream.on('test:fail', () => {
   process.exitCode = 1;
 });
 stream.on('error', (error) => {
-  console.error(error);
+  process.stderr.write(
+    `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+  );
   process.exitCode = 1;
 });
 
@@ -118,7 +119,7 @@ if (opts.testReporter.length > 0) {
         : await import(reporterName).then((m) => m.default);
 
     if (reporter == null) {
-      console.error('Invalid test reporter: ', reporterName);
+      process.stderr.write(`Invalid test reporter: ${reporterName}\n`);
       process.exit(1);
     }
 
