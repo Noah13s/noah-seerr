@@ -4,8 +4,13 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-COPY . /app
 WORKDIR /app
+COPY package.json pnpm-lock.yaml .npmrc ./
+COPY next.config.ts next-env.d.ts postcss.config.js tailwind.config.js tsconfig.json seerr-api.yml ./
+COPY bin ./bin
+COPY public ./public
+COPY src ./src
+COPY server ./server
 
 RUN pnpm install
 

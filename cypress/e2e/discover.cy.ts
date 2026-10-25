@@ -98,7 +98,7 @@ describe('Discover', () => {
       .find('[data-testid=title-card]')
       .first()
       .find('[data-testid=title-card-title]')
-      .contains('Movie Not Found');
+      .should('contain.text', 'Movie Not Found');
   });
 
   it('displays error for request with invalid TMDB ID', () => {
@@ -173,7 +173,7 @@ describe('Discover', () => {
       .find('[data-testid=request-card]')
       .first()
       .find('[data-testid=request-card-title]')
-      .contains('Movie Not Found');
+      .should('contain.text', 'Movie Not Found');
   });
 
   it('loads plex watchlist', () => {

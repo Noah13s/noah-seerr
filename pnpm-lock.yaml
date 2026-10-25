@@ -312,6 +312,9 @@ importers:
       '@types/nodemailer':
         specifier: ^8.0.0
         version: 8.0.0
+      '@types/pug':
+        specifier: 2.0.10
+        version: 2.0.10
       '@types/react':
         specifier: 19.2.14
         version: 19.2.14
@@ -2596,6 +2599,9 @@ packages:
 
   '@types/picomatch@4.0.2':
     resolution: {integrity: sha512-qHHxQ+P9PysNEGbALT8f8YOSHW0KJu6l2xU8DYY0fu/EmGxXdVnuTLvFUvBgPJMSqXq29SYHveejeAha+4AYgA==}
+
+  '@types/pug@2.0.10':
+    resolution: {integrity: sha512-Sk/uYFOBAB7mb74XcpizmH0KOR2Pv3D2Hmrh1Dmy5BmK3MpdSa5kqZcg6EKBdklU0bFXX9gCfzvpnyUehrPIuA==}
 
   '@types/qs@6.9.15':
     resolution: {integrity: sha512-uXHQKES6DQKKCLh441Xv/dwxOq1TVS3JPUMlEqoEglvlhR6Mxnlew/Xq/LRVHpLyk7iK3zODe1qYHIMltO7XGg==}
@@ -10521,6 +10527,8 @@ snapshots:
   '@types/parse-json@4.0.2': {}
 
   '@types/picomatch@4.0.2': {}
+
+  '@types/pug@2.0.10': {}
 
   '@types/qs@6.9.15': {}
 

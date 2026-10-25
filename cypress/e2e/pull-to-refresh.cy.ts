@@ -10,16 +10,12 @@ describe('Pull To Refresh', () => {
 
     cy.intercept({
       method: 'GET',
-      url: '/api/v1/*',
+      url: '/api/v1/**',
     }).as('apiCall');
 
     cy.get('.searchbar').swipe('bottom', [190, 500]);
 
-    cy.wait('@apiCall').then((interception) => {
-      assert.isNotNull(
-        interception.response.body,
-        'API was called and received data'
-      );
-    });
+    cy.wait('@apiCall').its('response.statusCode').should('eq', 200);
+    cy.contains('.slider-header', 'Trending').should('be.visible');
   });
 });

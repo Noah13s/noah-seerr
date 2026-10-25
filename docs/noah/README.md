@@ -11,6 +11,7 @@
 | You need playback, history, pairing or profile behavior | [Playback and features](playback.md) |
 | Something is slow, unavailable or inconsistent | [Troubleshooting](troubleshooting.md) |
 | You are running or changing tests | [Test gates and fixtures](../testing.md) |
+| You are reviewing static-analysis work | [Sonar remediation and finding ledger](sonar-remediation.md) |
 
 ## Source ownership
 

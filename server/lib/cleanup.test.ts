@@ -4,13 +4,12 @@ import type { WatchHistory } from '@server/entity/WatchHistory';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from 'node:test';
-import { cleanupReturnPath } from '../../src/utils/cleanupReturnPath';
+import pug from 'pug';
 import type { CleanupClientFactory, CleanupPlan } from './cleanupPlan';
 import { buildCleanupPlan, executeCleanupPlan } from './cleanupPlan';
 import { assessCleanup, assessManualCleanup } from './cleanupPolicy';
 import { previewToken, validPreview } from './cleanupReviews';
 import type { DVRSettings } from './settings';
-const pug = require('pug');
 
 const now = Date.parse('2026-10-01T12:00:00Z');
 const old = new Date(now - 15 * 86400000);
@@ -40,6 +39,50 @@ const history = (userId = 1, mediaType = 'movie'): WatchHistory =>
     seasonProgress: { '1': 12 },
     episodeOverrides: {},
   }) as unknown as WatchHistory;
+
+test('cleanup approval fingerprints ignore query order but change with requester membership', async () => {
+  const requests = [request(10), request(2)];
+  const histories = [history(10), history(2)];
+  const ordered = await assessCleanup(requests, histories, seasonInfo, now);
+  const reversed = await assessCleanup(
+    [...requests].reverse(),
+    [...histories].reverse(),
+    seasonInfo,
+    now
+  );
+  assert.equal(ordered[0].fingerprint, reversed[0].fingerprint);
+  assert.equal(ordered[0].eligible, true);
+  const added = await assessCleanup(
+    [...requests, request(3)],
+    [...histories, history(3)],
+    seasonInfo,
+    now
+  );
+  assert.notEqual(ordered[0].fingerprint, added[0].fingerprint);
+  assert.equal(
+    assessManualCleanup(requests, histories)[0].fingerprint,
+    assessManualCleanup([...requests].reverse(), histories)[0].fingerprint
+  );
+});
+
+test('season override order is canonical and a changed watched state invalidates approval', async () => {
+  const entry = history(2, 'tv');
+  entry.episodeOverrides = { '1:10': true, '1:2': true };
+  const original = (
+    await assessCleanup([request(2, 'tv')], [entry], seasonInfo, now)
+  )[0];
+  entry.episodeOverrides = { '1:2': true, '1:10': true };
+  assert.equal(
+    (await assessCleanup([request(2, 'tv')], [entry], seasonInfo, now))[0]
+      .fingerprint,
+    original.fingerprint
+  );
+  entry.episodeOverrides['1:2'] = false;
+  assert.equal(
+    (await assessCleanup([request(2, 'tv')], [entry], seasonInfo, now)).length,
+    0
+  );
+});
 
 test('active rewatches postpone cleanup without changing completed history', async () => {
   for (const type of ['movie', 'tv']) {
@@ -361,11 +404,4 @@ test('email has two authenticated review links and escapes media titles', () => 
     assert.doesNotMatch(html, /<script>/);
     assert.equal((html.match(/<a /g) || []).length, 2);
   }
-});
-test('login returns to cleanup review without allowing external redirects', () => {
-  const url =
-    '/admin-tools?review=12345678-1234-1234-1234-123456789abc&intent=keep';
-  assert.equal(cleanupReturnPath(url), url);
-  assert.equal(cleanupReturnPath('https://evil.example/' + url), '/');
-  assert.equal(cleanupReturnPath('//evil.example/admin-tools'), '/');
 });

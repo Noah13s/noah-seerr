@@ -18,7 +18,9 @@ async function resetDemoData(): Promise<void> {
       await dataSource.getRepository(entity.name).deleteAll();
     }
     // Add the default users
-    await seedTestUsers();
+    // initDemoData explicitly enables known-password demo accounts after its
+    // empty-database check; ordinary production seeding remains forbidden.
+    await seedTestUsers(true);
     // Remove admin user from the database
     await dataSource.getRepository('user').delete({ email: 'admin@seerr.dev' });
     // Re-seed discover sliders

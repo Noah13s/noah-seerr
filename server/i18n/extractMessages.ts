@@ -90,12 +90,20 @@ async function processMessages(dir: string): Promise<string> {
   const result: Record<string, string> = {};
   for (const extractedMessages of messagesByNamespace) {
     const { namespace, messages } = extractedMessages;
-    for (const key of Object.keys(messages).sort()) {
+    for (const key of Object.keys(messages).sort((a, b) =>
+      a.localeCompare(b, 'en')
+    )) {
       result[`${namespace}.${key}`] = messages[key];
     }
   }
 
-  return JSON.stringify(result, Object.keys(result).sort(), '  ') + '\n';
+  return (
+    JSON.stringify(
+      result,
+      Object.keys(result).sort((a, b) => a.localeCompare(b, 'en')),
+      '  '
+    ) + '\n'
+  );
 }
 
 async function saveMessages() {
