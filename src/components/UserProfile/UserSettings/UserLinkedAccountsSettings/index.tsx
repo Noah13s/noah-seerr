@@ -145,16 +145,20 @@ const UserLinkedAccountsSettings = () => {
     },
   ].filter((l) => !l.hide);
 
-  const deleteRequest = async (account: string) => {
-    try {
-      await axios.delete(
-        `/api/v1/user/${user?.id}/settings/linked-accounts/${account}`
-      );
-    } catch {
-      setError(intl.formatMessage(messages.deleteFailed));
-    }
+  const deleteRequest = (account: string) => {
+    setError(null);
+    axios
+      .delete(`/api/v1/user/${user?.id}/settings/linked-accounts/${account}`)
+      .then(() => revalidateUser())
+      .catch(() => {
+        setError(intl.formatMessage(messages.deleteFailed));
+      });
+  };
 
-    await revalidateUser();
+  const refreshLinkedAccount = () => {
+    revalidateUser().catch(() => {
+      setError(intl.formatMessage(messages.errorUnknown));
+    });
   };
 
   if (
@@ -268,7 +272,7 @@ const UserLinkedAccountsSettings = () => {
         onClose={() => setShowJellyfinModal(false)}
         onSave={() => {
           setShowJellyfinModal(false);
-          revalidateUser();
+          refreshLinkedAccount();
         }}
         onSwitchToQuickConnect={() => {
           setShowJellyfinModal(false);
@@ -281,7 +285,7 @@ const UserLinkedAccountsSettings = () => {
         onClose={() => setShowJellyfinQuickConnectModal(false)}
         onSave={() => {
           setShowJellyfinQuickConnectModal(false);
-          revalidateUser();
+          refreshLinkedAccount();
         }}
         onSwitchToPassword={() => {
           setShowJellyfinQuickConnectModal(false);

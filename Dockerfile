@@ -44,11 +44,12 @@ RUN \
   case "${TARGETPLATFORM}" in \
   'linux/arm64' | 'linux/arm/v7') \
   apk update && \
-  apk add --no-cache python3 make g++ gcc libc6-compat bash && \
-  npm install --global node-gyp \
+  apk add --no-cache python3 make g++ gcc libc6-compat bash \
   ;; \
   esac
 
+# node-gyp is a direct project dependency; native lifecycle scripts use its
+# frozen-lockfile installation instead of an unpinned global npm installation.
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store CYPRESS_INSTALL_BINARY=0 pnpm install --frozen-lockfile
 
 RUN pnpm build

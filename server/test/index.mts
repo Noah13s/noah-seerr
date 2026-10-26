@@ -1,9 +1,9 @@
 // Runs unit tests using the `node:test` runner.
 
 import { Command, Option } from 'commander';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, mkdirSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { run } from 'node:test';
 import * as reporters from 'node:test/reporters';
 import { fileURLToPath } from 'node:url';
@@ -84,12 +84,24 @@ const stream = run({
     resolveImport('./setup.ts'),
   ],
   coverage: opts.experimentalTestCoverage,
+  coverageIncludeGlobs: [join(BASE_DIR, 'server/**'), join(BASE_DIR, 'src/**')],
   coverageExcludeGlobs: [
+    '**/*.test.*',
     join(BASE_DIR, 'server/test/**'),
     join(BASE_DIR, 'server/migration/**'),
   ],
   testNamePatterns: opts.testNamePattern,
 });
+
+function reportFile(path: string) {
+  mkdirSync(dirname(path), { recursive: true });
+  const output = createWriteStream(path);
+  output.on('error', (error) => {
+    process.stderr.write(`Unable to write test report: ${error.message}\n`);
+    process.exitCode = 1;
+  });
+  return output;
+}
 
 // run() reports child failures as events; piping a reporter alone exits zero.
 // Keep the process alive to drain every reporter, but fail the CI step.
@@ -105,7 +117,7 @@ stream.on('error', (error) => {
 
 // In CI, write a JUnit report to a file for use by GitHub
 if (process.env.CI) {
-  const reportStream = createWriteStream(join(BASE_DIR, 'report.xml'));
+  const reportStream = reportFile(join(BASE_DIR, 'report.xml'));
   stream.compose(reporters.junit).pipe(reportStream);
 }
 
@@ -129,7 +141,7 @@ if (opts.testReporter.length > 0) {
         ? process.stdout
         : destArg === 'stderr'
           ? process.stderr
-          : createWriteStream(destArg);
+          : reportFile(destArg);
 
     stream.compose(reporter).pipe(dest);
   }

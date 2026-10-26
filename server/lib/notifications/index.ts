@@ -89,7 +89,7 @@ export const shouldSendAdminNotification = (
   );
 };
 
-class NotificationManager {
+export class NotificationManager {
   private activeAgents: NotificationAgent[] = [];
 
   public registerAgents = (agents: NotificationAgent[]): void => {
@@ -106,11 +106,22 @@ class NotificationManager {
       subject: payload.subject,
     });
 
-    this.activeAgents.forEach((agent) => {
-      if (agent.shouldSend()) {
-        agent.send(type, payload);
-      }
-    });
+    // Delivery stays detached from database hooks and request latency. Own each
+    // rejection separately so one broken agent cannot stop the other agents.
+    for (const agent of this.activeAgents) {
+      Promise.resolve()
+        .then(() => {
+          if (agent.shouldSend()) return agent.send(type, payload);
+        })
+        .catch((error: unknown) => {
+          logger.error('Notification agent failed', {
+            label: 'Notifications',
+            agent: agent.constructor.name,
+            notification: Notification[type],
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }
   }
 }
 

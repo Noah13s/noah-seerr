@@ -13,6 +13,7 @@
 | You are running or changing tests | [Test gates and fixtures](../testing.md) |
 | You are reviewing static-analysis work | [Sonar remediation and finding ledger](sonar-remediation.md) |
 | You need the next duplication/reliability batch | [Shared ARR forms and async jobs](sonar-remediation-2.md) |
+| You need coverage reporting or current reliability changes | [Runtime security and CI coverage](sonar-runtime-security.md) |
 
 ## Source ownership
 

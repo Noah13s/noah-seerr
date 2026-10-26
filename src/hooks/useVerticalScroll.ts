@@ -1,6 +1,5 @@
 import { debounce } from 'lodash';
-import type { MutableRefObject } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const IS_SCROLLING_CHECK_THROTTLE = 200;
 const BUFFER_HEIGHT = 200;
@@ -9,7 +8,7 @@ const BUFFER_HEIGHT = 200;
  * useVerticalScroll is a custom hook to handle infinite scrolling
  *
  * @param callback Callback is executed when page reaches bottom
- * @param shouldFetch Disables callback if true
+ * @param shouldFetch Enables callback when true
  */
 const useVerticalScroll = (
   callback: () => void,
@@ -17,11 +16,15 @@ const useVerticalScroll = (
 ): boolean => {
   const [isScrolling, setScrolling] = useState(false);
 
-  type SetTimeoutReturnType = ReturnType<typeof setTimeout>;
-  const scrollingTimer: MutableRefObject<SetTimeoutReturnType | undefined> =
-    useRef(undefined);
+  const current = useRef({ callback, shouldFetch });
+  const scrollingTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const runCallback = () => {
+  useEffect(() => {
+    current.current = { callback, shouldFetch };
+  }, [callback, shouldFetch]);
+
+  const runCallback = useCallback(() => {
+    const { callback, shouldFetch } = current.current;
     if (shouldFetch) {
       const scrollTop = Math.max(
         window.pageYOffset,
@@ -35,22 +38,19 @@ const useVerticalScroll = (
         callback();
       }
     }
-  };
-
-  const debouncedCallback = debounce(runCallback, 50);
+  }, []);
 
   useEffect(() => {
     runCallback();
-  });
+  }, [callback, shouldFetch, runCallback]);
 
   useEffect(() => {
+    const debouncedCallback = debounce(runCallback, 50);
     const onScroll = () => {
       if (scrollingTimer.current !== undefined) {
         clearTimeout(scrollingTimer.current);
       }
-      if (!isScrolling) {
-        setScrolling(true);
-      }
+      setScrolling(true);
 
       scrollingTimer.current = setTimeout(() => {
         setScrolling(false);
@@ -65,6 +65,7 @@ const useVerticalScroll = (
     window.addEventListener('resize', onResize, { passive: true });
 
     return () => {
+      debouncedCallback.cancel();
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
 
@@ -72,7 +73,7 @@ const useVerticalScroll = (
         clearTimeout(scrollingTimer.current);
       }
     };
-  });
+  }, [runCallback]);
 
   return isScrolling;
 };
