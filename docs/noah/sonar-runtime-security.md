@@ -51,6 +51,12 @@ coverage calculation. CI retains JUnit and LCOV for 14 days. Node coverage is
 limited to loaded production modules; it is not coverage of every UI component.
 The local suite reports 46.08% line coverage across 158 loaded source files.
 
+Reporter paths are limited to the fixed CI `report.xml`, the checkout's
+`coverage/` directory or the system temporary directory, with report extensions.
+Source-tree destinations, parent/output symlinks and existing hard links are
+rejected before the test harness starts. A real-entrypoint regression verifies
+that a refused destination creates no directory and produces an actionable error.
+
 ### Activate CI analysis after reviewing and merging the workflow
 
 All three repositories have a prepared `sonar` job and `sonar-project.properties`.
@@ -81,7 +87,7 @@ their historical execution is excluded from unit-test coverage.
 
 ## Validation and remaining work
 
-294 backend/client utility tests, four runner metatests, the final hook regression,
+294 backend/client utility tests, five runner metatests, the final hook regression,
 client/server typechecks, changed TypeScript ESLint and production server/Next
 builds passed locally. Hosted container/browser gates and a fresh Sonar scan of
 an approved commit remain necessary. No production deployment was performed.
