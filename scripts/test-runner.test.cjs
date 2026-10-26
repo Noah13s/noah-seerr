@@ -90,3 +90,40 @@ for (const flag of ['--coverage', '--experimental-test-coverage']) {
     }
   });
 }
+
+test('runner rejects reporter destinations in the source checkout', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'seerr-report-boundary-'));
+  const target = path.resolve(__dirname, '../src/.report-boundary/output.json');
+  try {
+    const fixture = path.join(dir, 'fixture.test.ts');
+    writeFileSync(
+      fixture,
+      "const {test}=require('node:test'); test('fixture',()=>{});\n"
+    );
+    const env = { ...process.env, CI: '', NODE_ENV: 'test' };
+    delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(
+      process.execPath,
+      [
+        'server/test/index.mts',
+        fixture,
+        '--test-reporter',
+        'spec',
+        '--test-reporter-destination',
+        target,
+      ],
+      {
+        cwd: path.resolve(__dirname, '..'),
+        env,
+        encoding: 'utf8',
+        timeout: 45000,
+      }
+    );
+    assert.ifError(result.error);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout + result.stderr, /Test reports must use/);
+    assert.equal(existsSync(path.dirname(target)), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
