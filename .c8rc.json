@@ -1,0 +1,8 @@
+{
+  "include": ["server/**", "src/**"],
+  "exclude": ["**/*.test.*", "server/test/**", "server/migration/**"],
+  "exclude-after-remap": true,
+  "all": false,
+  "reporter": ["text-summary", "lcovonly", "json-summary"],
+  "reports-dir": "coverage"
+}

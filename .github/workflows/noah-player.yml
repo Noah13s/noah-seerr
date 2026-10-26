@@ -26,10 +26,12 @@ jobs:
           CYPRESS_INSTALL_BINARY: 0
       - run: pnpm typecheck:client
       - run: pnpm typecheck:server
-      - run: node --test scripts/test-runner.test.cjs
+      - run: node --test scripts/test-runner.test.cjs scripts/test-coverage-report.cjs
       - run: node --test scripts/native-playback-session.test.cjs
       - run: mkdir -p coverage
-      - run: pnpm test --coverage --test-reporter spec --test-reporter lcov --test-reporter-destination stdout --test-reporter-destination coverage/lcov.info
+      # Native node:test LCOV uses transpiled locations under ts-node. c8 remaps
+      # V8 ranges through inline source maps before Sonar reads TypeScript lines.
+      - run: pnpm test:coverage
         env:
           CI: true
       - run: pnpm build:server
@@ -45,6 +47,7 @@ jobs:
           path: |
             report.xml
             coverage/lcov.info
+            coverage/coverage-summary.json
           if-no-files-found: ignore
           retention-days: 14
   sonar:
