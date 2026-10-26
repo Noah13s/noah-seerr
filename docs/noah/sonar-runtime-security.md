@@ -65,8 +65,9 @@ exclusions and failure exit status. The generated root JUnit `report.xml` is an
 analysis artifact, not source code.
 
 The corrected local run passes all 294 tests plus two reporting regressions.
-Its LCOV has 157 loaded production files, no out-of-bounds line/function/branch
-locations and no test files. It reports 48.16% line coverage of those loaded files;
+Its LCOV has 158 loaded production files, including the CommonJS playback bridge,
+no out-of-bounds line/function/branch
+locations and no test files. It reports 48.06% line coverage of those loaded files;
 this is not Sonar's whole-repository percentage or a claim of complete UI tests.
 
 Reporter paths are limited to the fixed CI `report.xml`, the checkout's

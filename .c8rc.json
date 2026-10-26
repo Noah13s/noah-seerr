@@ -1,5 +1,5 @@
 {
-  "include": ["server/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "include": ["server/**", "src/**"],
   "exclude": ["**/*.test.*", "server/test/**", "server/migration/**"],
   "exclude-after-remap": true,
   "all": false,
