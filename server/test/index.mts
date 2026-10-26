@@ -1,9 +1,18 @@
 // Runs unit tests using the `node:test` runner.
 
 import { Command, Option } from 'commander';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync, lstatSync, mkdirSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 import { run } from 'node:test';
 import * as reporters from 'node:test/reporters';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +79,19 @@ Object.assign(process.env, { NODE_ENV: 'test' });
 process.env.TS_NODE_PROJECT = resolveImport('./tsconfig.json');
 process.env.TS_NODE_FILES = 'true';
 
+// Validate/open destinations before run() starts its root test harness, so a
+// rejected path fails fast with a visible error rather than an unreported event.
+const reportDestinations = opts.testReporterDestination.map((destination) =>
+  destination === 'stdout'
+    ? process.stdout
+    : destination === 'stderr'
+      ? process.stderr
+      : reportFile(destination)
+);
+const ciReport = process.env.CI
+  ? reportFile(join(BASE_DIR, 'report.xml'))
+  : null;
+
 const stream = run({
   files,
   // Bound simultaneous TypeScript compiler/SQLite workers on hosted runners.
@@ -84,12 +106,57 @@ const stream = run({
     resolveImport('./setup.ts'),
   ],
   coverage: opts.experimentalTestCoverage,
+  coverageIncludeGlobs: [join(BASE_DIR, 'server/**'), join(BASE_DIR, 'src/**')],
   coverageExcludeGlobs: [
+    '**/*.test.*',
     join(BASE_DIR, 'server/test/**'),
     join(BASE_DIR, 'server/migration/**'),
   ],
   testNamePatterns: opts.testNamePattern,
 });
+
+function reportFile(path: string) {
+  const target = resolve(path);
+  const roots = [join(BASE_DIR, 'coverage'), tmpdir()].map((root) =>
+    resolve(root)
+  );
+  const root = roots.find((candidate) => {
+    const child = relative(candidate, target);
+    return (
+      child !== '' &&
+      !child.startsWith(`..${sep}`) &&
+      child !== '..' &&
+      !isAbsolute(child)
+    );
+  });
+  if (
+    (target !== resolve(BASE_DIR, 'report.xml') && !root) ||
+    !['.xml', '.info', '.lcov', '.json', '.txt', '.tap', '.log'].includes(
+      extname(target)
+    )
+  ) {
+    throw new Error(
+      'Test reports must use report.xml, coverage/ or the temporary directory'
+    );
+  }
+  // A local report must never follow an output/parent symlink into source files.
+  for (let entry = target; entry !== dirname(entry); entry = dirname(entry)) {
+    if (existsSync(entry) && lstatSync(entry).isSymbolicLink()) {
+      throw new Error('Test report paths cannot contain symbolic links');
+    }
+    if (entry === (root ?? BASE_DIR)) break;
+  }
+  if (existsSync(target) && lstatSync(target).nlink > 1) {
+    throw new Error('Test report output cannot be a hard link');
+  }
+  mkdirSync(dirname(target), { recursive: true });
+  const output = createWriteStream(target);
+  output.on('error', (error) => {
+    process.stderr.write(`Unable to write test report: ${error.message}\n`);
+    process.exitCode = 1;
+  });
+  return output;
+}
 
 // run() reports child failures as events; piping a reporter alone exits zero.
 // Keep the process alive to drain every reporter, but fail the CI step.
@@ -104,9 +171,8 @@ stream.on('error', (error) => {
 });
 
 // In CI, write a JUnit report to a file for use by GitHub
-if (process.env.CI) {
-  const reportStream = createWriteStream(join(BASE_DIR, 'report.xml'));
-  stream.compose(reporters.junit).pipe(reportStream);
+if (ciReport) {
+  stream.compose(reporters.junit).pipe(ciReport);
 }
 
 if (opts.testReporter.length > 0) {
@@ -123,13 +189,7 @@ if (opts.testReporter.length > 0) {
       process.exit(1);
     }
 
-    const destArg = opts.testReporterDestination[i];
-    const dest =
-      destArg === 'stdout' || destArg == null
-        ? process.stdout
-        : destArg === 'stderr'
-          ? process.stderr
-          : createWriteStream(destArg);
+    const dest = reportDestinations[i] ?? process.stdout;
 
     stream.compose(reporter).pipe(dest);
   }

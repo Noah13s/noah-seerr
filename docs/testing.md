@@ -1,12 +1,17 @@
 # Noah Seerr test gates
 
 The fork's active workflow is `.github/workflows/noah-player.yml`.
-It has two independent jobs:
+It has three regular jobs and a separately enabled Sonar job:
 
 | Check | Execution | Evidence |
 | --- | --- | --- |
-| `bridge-and-build` | Node 22.19, complete backend/utility suite, runner failure metatest, native session contracts, both typechecks, backend and Next builds | JUnit artifact, 14 days |
+| `bridge-and-build` | Node 22.19, complete backend/utility suite with coverage, runner failure/coverage metatests, native session contracts, both typechecks, backend and Next builds | JUnit and LCOV, 14 days |
+| `container-smoke` | Production Docker image, non-root runtime and isolated startup | Container logs |
 | `browser-fixture` | Built Next UI in Electron/Cypress; loopback-only SSR/API fixture; no Cypress recording key | Browser video/screenshots and fixture log, 14 days |
+| `sonar` (opt-in) | Current-commit static analysis and LCOV import after tests/build | Sonar quality gate |
+
+See [coverage and the CI migration](noah/sonar-runtime-security.md) before enabling
+`SONAR_CI_ENABLED`. Reports alone do not populate automatic Sonar analysis.
 
 ## Local commands
 

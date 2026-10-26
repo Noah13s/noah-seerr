@@ -28,7 +28,8 @@ jobs:
       - run: pnpm typecheck:server
       - run: node --test scripts/test-runner.test.cjs
       - run: node --test scripts/native-playback-session.test.cjs
-      - run: pnpm test
+      - run: mkdir -p coverage
+      - run: pnpm test --coverage --test-reporter spec --test-reporter lcov --test-reporter-destination stdout --test-reporter-destination coverage/lcov.info
         env:
           CI: true
       - run: pnpm build:server
@@ -41,9 +42,32 @@ jobs:
         if: always()
         with:
           name: seerr-test-results-${{ github.sha }}
-          path: report.xml
+          path: |
+            report.xml
+            coverage/lcov.info
           if-no-files-found: ignore
           retention-days: 14
+  sonar:
+    if: vars.SONAR_CI_ENABLED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    needs: bridge-and-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: seerr-test-results-${{ github.sha }}
+      - name: Require coverage and a configured analysis token
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          test -n "$SONAR_TOKEN"
+          test -s coverage/lcov.info
+      - uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   container-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 35

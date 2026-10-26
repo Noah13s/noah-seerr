@@ -1,6 +1,7 @@
 import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
 import RequestModal from '@app/components/RequestModal';
 import useSettings from '@app/hooks/useSettings';
+import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -14,9 +15,10 @@ import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import axios from 'axios';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { mutate } from 'swr';
+import { updateRequestBatch } from './requestActions';
 
 const messages = defineMessages('components.RequestButton', {
   viewrequest: 'View Request',
@@ -46,7 +48,7 @@ interface ButtonOption {
 
 interface RequestButtonProps {
   mediaType: 'movie' | 'tv';
-  onUpdate: () => void;
+  onUpdate: () => void | Promise<unknown>;
   tmdbId: number;
   media?: Media;
   isShowComplete?: boolean;
@@ -63,6 +65,9 @@ const RequestButton = ({
 }: RequestButtonProps) => {
   const intl = useIntl();
   const settings = useSettings();
+  const { addToast } = useToasts();
+  const modifying = useRef(false);
+  const [isModifying, setModifying] = useState(false);
   const { user, hasPermission } = useUser();
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
@@ -92,35 +97,41 @@ const RequestButton = ({
       : undefined;
   }, [active4kRequests, user]);
 
-  const modifyRequest = async (
-    request: MediaRequest,
-    type: 'approve' | 'decline'
-  ) => {
-    const response = await axios.post(`/api/v1/request/${request.id}/${type}`);
-
-    if (response) {
-      onUpdate();
-      mutate('/api/v1/request/count');
-    }
+  const showUpdateError = () => {
+    addToast(intl.formatMessage(globalMessages.error), {
+      appearance: 'error',
+      autoDismiss: true,
+    });
   };
 
-  const modifyRequests = async (
+  const refreshRequestState = () =>
+    Promise.all([
+      Promise.resolve().then(onUpdate),
+      mutate('/api/v1/request/count'),
+    ]);
+
+  const modifyRequests = (
     requests: MediaRequest[],
     type: 'approve' | 'decline'
-  ): Promise<void> => {
-    if (!requests) {
-      return;
-    }
-
-    await Promise.all(
-      requests.map(async (request) => {
-        return axios.post(`/api/v1/request/${request.id}/${type}`);
+  ): void => {
+    if (modifying.current || !requests.length) return;
+    modifying.current = true;
+    setModifying(true);
+    updateRequestBatch(
+      requests.map((request) => request.id),
+      type,
+      (id, decision) => axios.post(`/api/v1/request/${id}/${decision}`),
+      refreshRequestState
+    )
+      .finally(() => {
+        modifying.current = false;
+        setModifying(false);
       })
-    );
-
-    onUpdate();
-    mutate('/api/v1/request/count');
+      .catch(showUpdateError);
   };
+
+  const modifyRequest = (request: MediaRequest, type: 'approve' | 'decline') =>
+    modifyRequests([request], type);
 
   const buttons: ButtonOption[] = [];
 
@@ -380,7 +391,7 @@ const RequestButton = ({
         type={mediaType}
         editRequest={editRequest ? activeRequest : undefined}
         onComplete={() => {
-          onUpdate();
+          refreshRequestState().catch(showUpdateError);
           setShowRequestModal(false);
         }}
         onCancel={() => setShowRequestModal(false)}
@@ -392,12 +403,14 @@ const RequestButton = ({
         editRequest={editRequest ? active4kRequest : undefined}
         is4k
         onComplete={() => {
-          onUpdate();
+          refreshRequestState().catch(showUpdateError);
           setShowRequest4kModal(false);
         }}
         onCancel={() => setShowRequest4kModal(false)}
       />
       <ButtonWithDropdown
+        disabled={isModifying}
+        aria-busy={isModifying}
         text={
           <>
             {buttonOne.svg}
@@ -410,7 +423,10 @@ const RequestButton = ({
         {others && others.length > 0
           ? others.map((button) => (
               <ButtonWithDropdown.Item
-                onClick={button.action}
+                onClick={() => {
+                  if (!modifying.current) button.action();
+                }}
+                aria-disabled={isModifying}
                 key={`request-option-${button.id}`}
               >
                 {button.svg}

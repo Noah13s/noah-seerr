@@ -1,0 +1,112 @@
+{
+  "snapshotDate": "2026-10-26",
+  "state": "local-review-targets-not-confirmed-closures",
+  "note": "Fresh analysis of an approved commit must reconcile every issue. CLI and configured URL boundaries may need contextual review; moving code is not proof of closure.",
+  "targets": [
+    {
+      "key": "AaFoJSemOZDKsE3tmJCN",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/UserProfile/UserSettings/UserLinkedAccountsSettings/index.tsx",
+      "line": 284,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSemOZDKsE3tmJCL",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/UserProfile/UserSettings/UserLinkedAccountsSettings/index.tsx",
+      "line": 245,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSemOZDKsE3tmJCM",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/UserProfile/UserSettings/UserLinkedAccountsSettings/index.tsx",
+      "line": 271,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSl5OZDKsE3tmJD-",
+      "rule": "docker:S6505",
+      "component": "Noah13s_noah-seerr:Dockerfile",
+      "line": 48,
+      "message": "Omitting \"--ignore-scripts\" allows lifecycle scripts to run during package installation."
+    },
+    {
+      "key": "AaFoJSl5OZDKsE3tmJD9",
+      "rule": "docker:S8543",
+      "component": "Noah13s_noah-seerr:Dockerfile",
+      "line": 48,
+      "message": "Using dependencies without locking resolved versions is security-sensitive."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCn",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 156,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCo",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 164,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCp",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 182,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCq",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 192,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCr",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 226,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCs",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 234,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCt",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 252,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSi-OZDKsE3tmJCu",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:src/components/RequestButton/index.tsx",
+      "line": 262,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSV_OZDKsE3tmJAp",
+      "rule": "typescript:S9383",
+      "component": "Noah13s_noah-seerr:server/lib/notifications/index.ts",
+      "line": 111,
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator."
+    },
+    {
+      "key": "AaFoJSlWOZDKsE3tmJDU",
+      "rule": "typescript:S9114",
+      "component": "Noah13s_noah-seerr:src/hooks/useVerticalScroll.ts",
+      "line": 40,
+      "message": "This debounced function is recreated on every render, which resets its timer and defeats debouncing. Move it outside the component or hook, or wrap it in useMemo."
+    }
+  ]
+}
