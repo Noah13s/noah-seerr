@@ -45,11 +45,29 @@ flowchart LR
   Scan --> Cloud[Sonar coverage and quality gate]
 ```
 
-The runner now creates report directories, fails on report-write errors, supports
+The runner creates report directories, fails on report-write errors, supports
 both existing coverage flags and excludes test files from the production
-coverage calculation. CI retains JUnit and LCOV for 14 days. Node coverage is
-limited to loaded production modules; it is not coverage of every UI component.
-The local suite reports 46.08% line coverage across 158 loaded source files.
+coverage calculation. CI retains JUnit and LCOV for 14 days.
+
+Use `pnpm test:coverage` for source-level coverage. It runs the same test suite
+through pinned c8, which remaps V8 ranges through ts-node's inline source maps.
+The native `node:test` LCOV reporter reports transpiled locations with this
+loader: the first CI import reported 336 line inconsistencies and a function
+at generated line 1 instead of source line 2. That report's earlier percentages
+must not be used as an accurate TypeScript coverage baseline. The native flags
+remain available for diagnostics, but CI imports the remapped `coverage/lcov.info`.
+
+c8 reports the production modules loaded by the tests. Sonar independently
+includes untested production files in its denominator, so its overall coverage
+will differ from the local report. Tests do not cover every UI component.
+Regression tests check original function locations, source-line bounds, test
+exclusions and failure exit status. The generated root JUnit `report.xml` is an
+analysis artifact, not source code.
+
+The corrected local run passes all 294 tests plus two reporting regressions.
+Its LCOV has 157 loaded production files, no out-of-bounds line/function/branch
+locations and no test files. It reports 48.16% line coverage of those loaded files;
+this is not Sonar's whole-repository percentage or a claim of complete UI tests.
 
 Reporter paths are limited to the fixed CI `report.xml`, the checkout's
 `coverage/` directory or the system temporary directory, with report extensions.
@@ -59,9 +77,14 @@ that a refused destination creates no directory and produces an actionable error
 
 ### Activate CI analysis after reviewing and merging the workflow
 
-All three repositories have a prepared `sonar` job and `sonar-project.properties`.
-They remain disabled unless repository variable `SONAR_CI_ENABLED` is `true`.
-This prevents automatic analysis and CI analysis from competing during migration.
+All three repositories have a `sonar` job and `sonar-project.properties`.
+The jobs run when repository variable `SONAR_CI_ENABLED` is `true`.
+Automatic Analysis and CI analysis must not compete during migration.
+
+On 26 October 2026 the owner approved activating CI analysis in all three
+projects. The repository secrets and variables are remote settings; their token
+values must never be recorded here. Use the following steps for a new project or
+when recovering a missing configuration.
 
 1. Add a project-scoped analysis token as repository secret `SONAR_TOKEN`. Never
    place a token in source, a command argument, an artifact or a screenshot.
@@ -74,9 +97,13 @@ This prevents automatic analysis and CI analysis from competing during migration
 The jobs fetch full history, require nonempty reports, exclude fork PRs from
 token-bearing scans and wait for Sonar's quality gate. They use normal
 `pull_request`, never `pull_request_target`. Tests and coverage artifacts still
-run on fork PRs. No cloud settings or credentials have been changed by this
-source batch. On a failed migration, disable the variable and restore Automatic
+run on fork PRs. On a failed migration, disable the variable and restore Automatic
 Analysis until the scanner problem is resolved.
+
+An imported coverage report can make a previously green gate fail: the existing
+80% new-code requirement is now evaluated instead of having no coverage data.
+Fix missing tests rather than lowering that requirement, excluding untested
+production code or advancing the new-code baseline merely to turn the gate green.
 
 For Jellyfin Web the reports cover Vitest plus its independent Node casting
 contracts. For Stream the scanner receives Flutter LCOV normalized to repository
