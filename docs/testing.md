@@ -61,10 +61,22 @@ GPU tone mapping or long-run stability.
 
 ## SonarQube Cloud
 
-`SonarCloud Code Analysis` supplements both test jobs. Its current automatic
-analysis reads repository source; it does not execute these tests or import
-coverage. A displayed zero/missing coverage value is not a measured result from
-this suite. See [Sonar's coverage documentation](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview/).
+CI analysis is enabled on this fork; Automatic Analysis is disabled. The `sonar`
+job imports the c8 LCOV artifact from the same commit. A report that imports
+successfully can still fail the unchanged 80% new-code coverage gate.
+See [Sonar's coverage documentation](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview/).
 Keep test/build and Sonar checks green for the exact PR commit before merging.
 The workflow runs on PR updates and `main`, avoiding duplicate branch-push runs;
 manual dispatch is available for a branch without a PR.
+
+### Coverage-gate regressions
+
+`server/job/schedule.test.ts` registers the real scheduled-job callbacks against
+an in-memory scheduler and isolated scanner methods. It verifies media-server
+routing, configured cron values, cancellation, download/cache maintenance and
+recovery after a rejected scan. It starts no real timers or network requests.
+
+`server/test/**` and `scripts/check-runtime-image.mjs` are test runners/fixtures,
+not application code. Sonar classifies them as tests; production schedulers and
+other application source remain in coverage analysis. Do not lower the gate or
+move the new-code baseline to hide uncovered production paths.
