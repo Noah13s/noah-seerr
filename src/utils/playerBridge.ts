@@ -10,6 +10,7 @@ export interface PlayerSnapshot {
 }
 
 type Pending = {
+  action: string;
   resolve: (state: PlayerSnapshot) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -87,6 +88,16 @@ export class PlayerBridge {
         const waiting = this.readyWaiters.splice(0);
         waiting.forEach((start) => start());
       }
+      // A decoded frame is stronger evidence than a late command reply. Some
+      // native players keep their open promise pending even while video plays.
+      if (message.event === 'firstFrame' && state) {
+        for (const [id, pending] of this.pending) {
+          if (pending.action !== 'play') continue;
+          this.pending.delete(id);
+          clearTimeout(pending.timer);
+          pending.resolve(state);
+        }
+      }
       this.onEvent(message.event, state);
     }
   };
@@ -102,7 +113,7 @@ export class PlayerBridge {
         },
         action === 'play' ? 85_000 : 10_000
       );
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { action, resolve, reject, timer });
       const dispatch = () => {
         if (!this.closed && this.pending.has(id))
           this.send({ kind: 'command', id, action, payload });
