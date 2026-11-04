@@ -3,6 +3,7 @@ import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { clientBuildId, frontendUpdated } from '@app/utils/frontendUpdate';
 import { Transition } from '@headlessui/react';
 import type { StatusResponse } from '@server/interfaces/api/settingsInterfaces';
 import { Fragment, useEffect, useState } from 'react';
@@ -30,6 +31,27 @@ const StatusChecker = () => {
     }
   );
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const [currentBuildId, setCurrentBuildId] = useState<string>();
+
+  useEffect(() => {
+    try {
+      setCurrentBuildId(
+        clientBuildId(
+          JSON.parse(
+            document.getElementById('__NEXT_DATA__')?.textContent || '{}'
+          )
+        )
+      );
+    } catch {
+      // An unavailable identity must not produce an unrecoverable reload prompt.
+    }
+  }, []);
+  const appUpdated = frontendUpdated({
+    serverBuildId: data?.frontendBuildId,
+    currentBuildId,
+    serverCommit: data?.commitTag,
+    currentCommit: process.env.commitTag,
+  });
 
   useEffect(() => {
     if (!data?.restartRequired) {
@@ -58,7 +80,7 @@ const StatusChecker = () => {
       show={
         !alertDismissed &&
         ((hasPermission(Permission.ADMIN) && data.restartRequired) ||
-          data.commitTag !== process.env.commitTag)
+          appUpdated)
       }
     >
       {hasPermission(Permission.ADMIN) && data.restartRequired ? (
@@ -67,7 +89,7 @@ const StatusChecker = () => {
           backgroundClickable={false}
           onOk={() => {
             setAlertDismissed(true);
-            if (data.commitTag !== process.env.commitTag) {
+            if (appUpdated) {
               location.reload();
             }
           }}

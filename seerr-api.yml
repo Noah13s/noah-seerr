@@ -2370,6 +2370,9 @@ paths:
                     example: 1.0.0
                   commitTag:
                     type: string
+                  frontendBuildId:
+                    type: string
+                    description: Identity of the deployed frontend assets, independent of backend source provenance.
                   updateAvailable:
                     type: boolean
                   commitsBehind:
