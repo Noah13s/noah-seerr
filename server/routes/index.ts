@@ -28,6 +28,7 @@ import { getAppVersion, getCommitTag } from '@server/utils/appVersion';
 import restartFlag from '@server/utils/restartFlag';
 import { isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
+import adminInsightsRoutes from './adminInsights';
 import authRoutes from './auth';
 import blocklistRoutes from './blocklist';
 import cleanupReviewRoutes from './cleanupReviews';
@@ -162,6 +163,7 @@ router.use('/request', isAuthenticated(), requestRoutes);
 router.use('/watchlist', isAuthenticated(), watchlistRoutes);
 router.use('/watch-history', isAuthenticated(), watchHistoryRoutes);
 router.use('/cleanup-reviews', isAuthenticated(), cleanupReviewRoutes);
+router.use('/admin-tools', adminInsightsRoutes);
 router.use('/blocklist', isAuthenticated(), blocklistRoutes);
 router.use(
   '/blacklist',

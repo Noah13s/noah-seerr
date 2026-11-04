@@ -10,8 +10,10 @@ export const getRequestDownloadStatus = (
     return items;
   }
 
-  return items.filter(
-    (item) => item.episode && seasonNumbers.includes(item.episode.seasonNumber)
+  return items.filter((item) =>
+    seasonNumbers.includes(
+      item.seasonNumber ?? item.episode?.seasonNumber ?? -1
+    )
   );
 };
 

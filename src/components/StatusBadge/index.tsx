@@ -2,11 +2,17 @@ import Spinner from '@app/assets/spinner.svg';
 import Badge from '@app/components/Common/Badge';
 import Tooltip from '@app/components/Common/Tooltip';
 import DownloadBlock from '@app/components/DownloadBlock';
+import RequestPipelineStatus from '@app/components/RequestPipelineStatus';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import type { UpcomingRelease } from '@app/utils/releaseDates';
+import {
+  pipelineSummary,
+  requestPercent,
+  requestStage,
+} from '@app/utils/requestPipeline';
 import { MediaStatus } from '@server/constants/media';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import { useIntl } from 'react-intl';
@@ -75,22 +81,29 @@ const StatusBadge = ({
   });
   const liveMedia = liveDetails?.mediaInfo;
   const rawStatus = liveMedia
-    ? is4k ? liveMedia.status4k : liveMedia.status
+    ? is4k
+      ? liveMedia.status4k
+      : liveMedia.status
     : initialStatus;
-  const status = settings.currentSettings.blocklistEnabled === false &&
+  const status =
+    settings.currentSettings.blocklistEnabled === false &&
     rawStatus === MediaStatus.BLOCKLISTED
       ? MediaStatus.UNKNOWN
       : rawStatus;
   const downloadItem = liveMedia
-    ? (is4k ? liveMedia.downloadStatus4k : liveMedia.downloadStatus) ?? []
+    ? ((is4k ? liveMedia.downloadStatus4k : liveMedia.downloadStatus) ?? [])
     : initialDownloadItem;
   const inProgress = liveMedia ? downloadItem.length > 0 : initialInProgress;
   const distinctDownloads = downloadItem.filter(
     (item, index, all) =>
-      all.findIndex((candidate) => candidate.downloadId === item.downloadId) === index
+      all.findIndex((candidate) => candidate.downloadId === item.downloadId) ===
+      index
   );
   const totalSize = distinctDownloads.reduce((sum, item) => sum + item.size, 0);
-  const totalLeft = distinctDownloads.reduce((sum, item) => sum + item.sizeLeft, 0);
+  const totalLeft = distinctDownloads.reduce(
+    (sum, item) => sum + item.sizeLeft,
+    0
+  );
   const downloadPercent = totalSize
     ? Math.max(0, Math.min(100, Math.round((1 - totalLeft / totalSize) * 100)))
     : 0;
@@ -109,11 +122,11 @@ const StatusBadge = ({
                 ? messages.awaitingPhysical
                 : messages.awaitingEpisode,
           {
-          date: intl.formatDate(parsedReleaseDate, {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          }),
+            date: intl.formatDate(parsedReleaseDate, {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            }),
           }
         )
       : intl.formatMessage(messages.releaseUnknown);
@@ -173,6 +186,49 @@ const StatusBadge = ({
       }}
     />
   );
+
+  const pipelineItem = pipelineSummary(downloadItem);
+  if (
+    pipelineItem &&
+    ![MediaStatus.PENDING, MediaStatus.BLOCKLISTED].includes(
+      status ?? MediaStatus.UNKNOWN
+    )
+  ) {
+    const stage = requestStage(pipelineItem);
+    const percent = requestPercent(pipelineItem);
+    return (
+      <Tooltip
+        content={tooltipContent}
+        className="hidden max-h-96 w-96 overflow-y-auto sm:block"
+        tooltipConfig={{ interactive: true, delayHide: 100 }}
+      >
+        <Badge
+          badgeType={
+            ['stalled', 'blocked', 'unavailable'].includes(stage)
+              ? 'warning'
+              : 'primary'
+          }
+          href={mediaLink}
+          className="relative max-w-full overflow-hidden !whitespace-normal !bg-gray-700/80"
+        >
+          {percent !== undefined && (
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-0 bg-indigo-600/60 transition-all duration-200"
+              style={{ width: `${percent}%` }}
+            />
+          )}
+          <span className="relative z-10 inline-flex min-w-0 items-center gap-1.5">
+            {is4k && <span>4K</span>}
+            <RequestPipelineStatus item={pipelineItem} />
+            {['searching', 'metadata', 'importing', 'indexing'].includes(
+              stage
+            ) && <Spinner className="h-3 w-3 shrink-0" />}
+          </span>
+        </Badge>
+      </Tooltip>
+    );
+  }
 
   switch (status) {
     case MediaStatus.AVAILABLE:

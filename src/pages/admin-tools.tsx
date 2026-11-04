@@ -1,4 +1,5 @@
 import AdminCleanupReview from '@app/components/AdminCleanupReview';
+import AdminRequestPipeline from '@app/components/AdminRequestPipeline';
 import Header from '@app/components/Common/Header';
 import useRouteGuard from '@app/hooks/useRouteGuard';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -143,6 +144,7 @@ const AdminToolsPage: NextPage = () => {
           ? 'Gérez vos médias, indexeurs et téléchargements ici.'
           : 'Manage media, indexers and downloads here.'}
       </p>
+      <AdminRequestPipeline />
       <section aria-label="Media insights" className="mt-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-white">Media insights</h2>

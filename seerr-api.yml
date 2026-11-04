@@ -2240,6 +2240,17 @@ paths:
       responses:
         '204':
           description: Administrator authorized
+  /admin-tools/pipeline:
+    get:
+      summary: Get fresh request stages and retained recovery attempts
+      description: Administrator-only monitoring. Stale or missing snapshots are explicitly unavailable.
+      tags:
+        - admin
+      responses:
+        '200':
+          description: Sanitized request stages and monitor freshness
+        '403':
+          description: Administrator permission required
   /admin-tools/insights:
     get:
       summary: Get administrator watch, disk, and cleanup preview insights
