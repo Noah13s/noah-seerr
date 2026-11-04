@@ -9,6 +9,7 @@
 | You are changing the bridge, UI or backend | [Development](development.md) |
 | You are releasing or updating a fork | [Deployment and updates](deployment.md) |
 | You need playback, history, pairing or profile behavior | [Playback and features](playback.md) |
+| A request is searching, importing or delayed | [Request progress](request-pipeline.md) |
 | Something is slow, unavailable or inconsistent | [Troubleshooting](troubleshooting.md) |
 | You are running or changing tests | [Test gates and fixtures](../testing.md) |
 | You are reviewing static-analysis work | [Sonar remediation and finding ledger](sonar-remediation.md) |

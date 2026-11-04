@@ -4,6 +4,11 @@ import { MediaType } from '@server/constants/media';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { uniqWith } from 'lodash';
+import type { PipelineProgress } from './requestPipeline';
+import {
+  cachedPipelineSnapshot,
+  mergePipelineProgress,
+} from './requestPipeline';
 
 interface EpisodeNumberResult {
   seasonNumber: number;
@@ -11,7 +16,7 @@ interface EpisodeNumberResult {
   absoluteEpisodeNumber: number;
   id: number;
 }
-export interface DownloadingItem {
+export interface DownloadingItem extends PipelineProgress {
   mediaType: MediaType;
   externalId: number;
   size: number;
@@ -32,12 +37,14 @@ class DownloadTracker {
     serverId: number,
     externalServiceId: number
   ): DownloadingItem[] {
-    if (!this.radarrServers[serverId]) {
-      return [];
-    }
-
-    return this.radarrServers[serverId].filter(
-      (item) => item.externalId === externalServiceId
+    return mergePipelineProgress(
+      (this.radarrServers[serverId] ?? []).filter(
+        (item) => item.externalId === externalServiceId
+      ),
+      cachedPipelineSnapshot(),
+      'movie',
+      serverId,
+      externalServiceId
     );
   }
 
@@ -45,12 +52,14 @@ class DownloadTracker {
     serverId: number,
     externalServiceId: number
   ): DownloadingItem[] {
-    if (!this.sonarrServers[serverId]) {
-      return [];
-    }
-
-    return this.sonarrServers[serverId].filter(
-      (item) => item.externalId === externalServiceId
+    return mergePipelineProgress(
+      (this.sonarrServers[serverId] ?? []).filter(
+        (item) => item.externalId === externalServiceId
+      ),
+      cachedPipelineSnapshot(),
+      'tv',
+      serverId,
+      externalServiceId
     );
   }
 
@@ -110,6 +119,7 @@ class DownloadTracker {
               );
             }
           } catch {
+            this.radarrServers[server.id] = [];
             logger.error(
               `Unable to get queue from Radarr server: ${server.name}`,
               {
@@ -189,6 +199,7 @@ class DownloadTracker {
               );
             }
           } catch {
+            this.sonarrServers[server.id] = [];
             logger.error(
               `Unable to get queue from Sonarr server: ${server.name}`,
               {

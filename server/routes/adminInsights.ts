@@ -5,12 +5,21 @@ import { WatchHistory, WatchHistoryStatus } from '@server/entity/WatchHistory';
 import { RETENTION_DAYS } from '@server/lib/cleanupPolicy';
 import { cleanupCandidates } from '@server/lib/cleanupReviews';
 import { Permission } from '@server/lib/permissions';
+import { readPipelineSnapshot } from '@server/lib/requestPipeline';
 import { isAuthenticated } from '@server/middleware/auth';
 import { Router } from 'express';
 import { readdir, stat, statfs } from 'fs/promises';
 import path from 'path';
 
 const router = Router();
+router.get(
+  '/pipeline',
+  isAuthenticated(Permission.ADMIN),
+  async (_req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json(await readPipelineSnapshot());
+  }
+);
 let diskCache:
   | { expires: number; value: Awaited<ReturnType<typeof diskSnapshot>> }
   | undefined;
