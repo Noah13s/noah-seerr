@@ -1,6 +1,19 @@
 // Actual built Next UI, SSR included. The loopback API fixture is intentionally
 // separate from backend/SQLite tests; no recording key or real login is needed.
 describe('profile history and planned list', () => {
+  it('does not repeat update prompts when frontend and retained backend have different source tags', () => {
+    cy.intercept('GET', '/api/v1/status*').as('status');
+    cy.setCookie('fixture-profile', '1');
+    cy.visit('/watch-history');
+    cy.wait('@status');
+    cy.contains('a:visible', 'Private history 1').should('be.visible');
+    for (let count = 0; count < 2; count++) {
+      cy.reload();
+      cy.wait('@status');
+      cy.contains('a:visible', 'Private history 1').should('be.visible');
+      cy.contains('Fixture Stream Updated').should('not.exist');
+    }
+  });
   for (const width of [390, 1280]) {
     it(`keeps filters and upcoming metadata at ${width}px without anime for opted-out users`, () => {
       cy.viewport(width, 844);

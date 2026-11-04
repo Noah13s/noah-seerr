@@ -79,6 +79,7 @@ export interface CacheResponse {
 export interface StatusResponse {
   version: string;
   commitTag: string;
+  frontendBuildId?: string;
   updateAvailable?: boolean;
   commitsBehind?: number;
   restartRequired: boolean;

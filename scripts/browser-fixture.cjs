@@ -73,9 +73,12 @@ const server = http.createServer(async (req, res) => {
   if (path === '/status')
     return send({
       version: 'fixture',
-      commitTag: require('node:fs').existsSync('committag.json')
-        ? require('../committag.json').commitTag
-        : 'local',
+      frontendBuildId: require('node:fs')
+        .readFileSync('.next/BUILD_ID', 'utf8')
+        .trim(),
+      // The deployed backend can deliberately retain a different source tag.
+      // Reload checks must compare the actual Next build identity instead.
+      commitTag: 'fixture-retained-backend',
       updateAvailable: false,
     });
   if (path === '/auth/local' && req.method === 'POST') {
