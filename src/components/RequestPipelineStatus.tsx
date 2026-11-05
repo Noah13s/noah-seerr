@@ -33,6 +33,19 @@ const messages = defineMessages('components.RequestPipelineStatus', {
   serviceUnavailable: 'The media service is temporarily unavailable',
   searchFailed: 'Search failed; recovery is monitored',
   downloadError: 'Download client reported an error',
+  quotaExhausted:
+    'Tracker download allowance exhausted; waiting for credit or an eligible alternative',
+  creditLow:
+    'This release exceeds the tracker credit budget; searching eligible alternatives',
+  creditStale:
+    'Tracker allowance could not be verified; new downloads from this tracker are held',
+  credentialsInvalid:
+    'Tracker credentials need attention; automatic retries are paused',
+  rateLimited: 'Tracker request limit reached; waiting before retrying',
+  releaseUnregistered: 'This release is no longer registered with its tracker',
+  sizeUnknown: 'Tracker release size could not be verified safely',
+  storageFull: 'Not enough free download space; waiting for space',
+  filesMissing: 'Download files are missing; automatic resume is paused',
 });
 const reasonMessages = {
   'import-rejected': messages.importRejected,
@@ -45,6 +58,15 @@ const reasonMessages = {
   'service-unavailable': messages.serviceUnavailable,
   'search-failed': messages.searchFailed,
   'download-client-error': messages.downloadError,
+  'tracker-quota-exhausted': messages.quotaExhausted,
+  'tracker-credit-low': messages.creditLow,
+  'tracker-credit-stale': messages.creditStale,
+  'tracker-credentials-invalid': messages.credentialsInvalid,
+  'tracker-rate-limited': messages.rateLimited,
+  'tracker-release-unregistered': messages.releaseUnregistered,
+  'tracker-size-unknown': messages.sizeUnknown,
+  'storage-full': messages.storageFull,
+  'download-files-missing': messages.filesMissing,
 };
 
 export default function RequestPipelineStatus({

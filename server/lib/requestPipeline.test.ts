@@ -42,6 +42,54 @@ const download = (id = 'a'.repeat(40)): DownloadingItem => ({
   title: 'Release title',
 });
 
+test('tracker account budgets are sanitized without exposing adapter secrets', () => {
+  const result = parsePipelineSnapshot(
+    {
+      version: 1,
+      generatedAt: new Date(now).toISOString(),
+      trackerHealth: [
+        {
+          id: 'c411',
+          name: 'C411',
+          budgeted: true,
+          fresh: true,
+          availableBytes: -132000000,
+          reservedBytes: 5000000000,
+          reservations: 2,
+          checkedAt: new Date(now).toISOString(),
+          reason: 'tracker-quota-exhausted',
+          apiKey: 'private-token',
+          url: 'https://private/announce/key',
+        },
+        { id: 'https://private-key', name: 'invalid' },
+      ],
+    },
+    now
+  );
+  assert.equal(result.trackerHealth?.length, 1);
+  assert.equal(result.trackerHealth?.[0].availableBytes, -132000000);
+  assert.equal(result.trackerHealth?.[0].reservations, 2);
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /private-token|private\/announce|apiKey/
+  );
+});
+
+test('stale monitor files cannot advertise fresh account credit', () => {
+  const result = parsePipelineSnapshot(
+    {
+      version: 1,
+      generatedAt: new Date(now - 180001).toISOString(),
+      trackerHealth: [
+        { id: 'c411', name: 'C411', fresh: true, availableBytes: 50000000000 },
+      ],
+    },
+    now
+  );
+  assert.equal(result.fresh, false);
+  assert.equal(result.trackerHealth, undefined);
+});
+
 test('real search progress exists before a torrent and remains scoped by service, media and season', () => {
   const data = snapshot();
   const result = mergePipelineProgress([], data, 'tv', 0, 14);

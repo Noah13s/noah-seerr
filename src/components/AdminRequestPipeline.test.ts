@@ -67,6 +67,39 @@ test('ordinary profiles never render administrative request monitoring', () => {
   assert.equal(render(snapshot, 'en', 0), '');
 });
 
+test('tracker credit and account restrictions render for administrators in both languages', () => {
+  const data: PipelineSnapshot = {
+    ...snapshot,
+    trackerHealth: [
+      {
+        id: 'c411',
+        name: 'C411',
+        budgeted: true,
+        fresh: false,
+        reason: 'tracker-quota-exhausted',
+        availableBytes: -132000000,
+        reservedBytes: 5 * 1024 ** 3,
+        reservations: 1,
+        checkedAt: '2026-11-03T19:00:00Z',
+        adapterError: 'profile-unavailable',
+        retryAt: '2026-11-03T19:30:00Z',
+      },
+    ],
+  };
+  const english = render(data);
+  assert.match(english, /Download allowance exhausted/);
+  assert.match(english, /Account allowance/);
+  assert.match(english, /Reserved credit/);
+  assert.match(english, /5 GiB/);
+  assert.match(english, /Zen is never spent automatically/);
+  const frenchHtml = render(data, 'fr');
+  assert.match(frenchHtml, /Crédit de téléchargement épuisé/);
+  assert.match(frenchHtml, /Crédit réservé/);
+  assert.match(frenchHtml, /données anciennes/);
+  assert.doesNotMatch(frenchHtml, /Ã|Â|�|NaN|undefined/);
+  assert.equal(render(data, 'fr', 0), '');
+});
+
 test('administrator overview keeps slow searches and retained attempts distinct', () => {
   const html = render(snapshot);
   assert.match(html, /Fixture series/);
