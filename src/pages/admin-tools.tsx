@@ -161,7 +161,7 @@ const AdminToolsPage: NextPage = () => {
           ['monitoring', french ? 'Suivi des demandes' : 'Request monitoring'],
           ['cleanup', french ? 'Nettoyage' : 'Cleanup approvals'],
           ['activity', french ? 'Historique d’activité' : 'Activity history'],
-          ['services', french ? 'Services' : 'Services'],
+          ['services', 'Services'],
         ].map(([id, label]) => (
           <button
             key={id}
