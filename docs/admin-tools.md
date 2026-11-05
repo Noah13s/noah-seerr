@@ -65,6 +65,28 @@ as blocked replacement attempts, rather than overriding normal availability.
 Active upgrades and missing episodes remain visible. These
 conditions do not authorize deletion, repeated restarts or bypassing tracker access.
 
+### Tracker account health
+
+The request-monitor panel also displays the optional, administrator-only
+`trackerHealth` snapshot. For budgeted accounts it shows verified allowance,
+reserved bytes, pending reservations and the last verification time. Restrictions,
+stale credit and profile-adapter setup errors remain separate; a generic access
+denial is not automatically labelled quota exhaustion. Retry timestamps are the
+earliest possible probe time, not a promise that a tracker will recover then.
+
+The data is sanitized and bounded by `server/lib/requestPipeline.ts`. It is only
+returned through the existing admin pipeline endpoint, with private/no-store
+responses. Ordinary download-status enrichment does not include account balances.
+There are English/French labels and responsive cards; the panel sends no tracker
+commands and never spends Zen. A missing or stale monitor cannot block ordinary
+Seerr reads or fabricate available credit.
+
+The separate private Noah Stream deployment owns account verification, transactional
+reservations, the local Prowlarr admission gateway and journaled fallback. Do not
+put tracker keys into Seerr translations, frontend configuration or this repository.
+The conservative full-torrent credit reservation is distinct from the 18 GiB
+per-movie/per-episode media rule; it is not a total-season size restriction.
+
 ## Validation and deployment
 
 Run the isolated activity DB/access/pagination tests, playback transition tests,

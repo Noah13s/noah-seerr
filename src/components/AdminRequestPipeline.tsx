@@ -1,4 +1,5 @@
 import RequestPipelineStatus from '@app/components/RequestPipelineStatus';
+import TrackerHealth from '@app/components/TrackerHealth';
 import { Permission, useUser } from '@app/hooks/useUser';
 import { MediaType } from '@server/constants/media';
 import type { PipelineSnapshot } from '@server/lib/requestPipeline';
@@ -71,6 +72,7 @@ export default function AdminRequestPipeline() {
           </div>
         ))}
       </div>
+      <TrackerHealth trackers={data?.trackerHealth ?? []} />
       <ul className="mt-3 divide-y divide-gray-700">
         {(data?.records ?? []).slice(0, visible).map((row) => (
           <li

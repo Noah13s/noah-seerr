@@ -1,4 +1,13 @@
 {
+  "components.RequestPipelineStatus.quotaExhausted": "Crédit du tracker épuisé ; attente de crédit ou d’une autre source compatible",
+  "components.RequestPipelineStatus.creditLow": "Cette version dépasse le crédit disponible ; recherche d’autres sources compatibles",
+  "components.RequestPipelineStatus.creditStale": "Le crédit du tracker n’a pas pu être vérifié ; nouveaux téléchargements suspendus",
+  "components.RequestPipelineStatus.credentialsInvalid": "Identifiants du tracker à vérifier ; tentatives automatiques suspendues",
+  "components.RequestPipelineStatus.rateLimited": "Limite de requêtes du tracker atteinte ; nouvelle tentative différée",
+  "components.RequestPipelineStatus.releaseUnregistered": "Cette version n’est plus enregistrée sur son tracker",
+  "components.RequestPipelineStatus.sizeUnknown": "La taille de cette version n’a pas pu être vérifiée",
+  "components.RequestPipelineStatus.storageFull": "Espace de téléchargement insuffisant ; attente de place libre",
+  "components.RequestPipelineStatus.filesMissing": "Fichiers téléchargés introuvables ; reprise automatique suspendue",
   "components.RequestPipelineStatus.searching": "Recherche",
   "components.RequestPipelineStatus.metadata": "Récupération des détails du torrent",
   "components.RequestPipelineStatus.downloading": "Téléchargement",

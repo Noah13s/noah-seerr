@@ -34,6 +34,7 @@ interface PipelineRecord extends PipelineProgress {
   sizeLeft: number;
 }
 export interface PipelineSnapshot {
+  trackerHealth?: TrackerHealth[];
   clientAvailable?: boolean;
   generatedAt?: string;
   fresh: boolean;
@@ -46,6 +47,59 @@ export interface PipelineSnapshot {
     retained: boolean;
     reason: string;
   }[];
+}
+
+export interface TrackerHealth {
+  id: string;
+  name: string;
+  budgeted: boolean;
+  fresh: boolean;
+  reason?: string;
+  checkedAt?: string;
+  retryAt?: string;
+  availableBytes?: number;
+  reservedBytes: number;
+  reservations: number;
+  adapterError?: string;
+}
+
+function trackerHealth(value: unknown): TrackerHealth[] {
+  return (Array.isArray(value) ? value.slice(0, 100) : []).flatMap((value) => {
+    const row = object(value);
+    if (
+      !row ||
+      typeof row.id !== 'string' ||
+      !/^[a-z0-9_-]{1,64}$/.test(row.id) ||
+      typeof row.name !== 'string'
+    )
+      return [];
+    const balance =
+      typeof row.availableBytes === 'number' &&
+      Number.isSafeInteger(row.availableBytes)
+        ? row.availableBytes
+        : undefined;
+    return [
+      {
+        id: row.id,
+        name: [...row.name]
+          .filter(
+            (character) =>
+              character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127
+          )
+          .join('')
+          .slice(0, 100),
+        budgeted: row.budgeted === true,
+        fresh: row.fresh === true,
+        reason: reasonCode(row.reason),
+        checkedAt: date(row.checkedAt),
+        retryAt: date(row.retryAt),
+        availableBytes: balance,
+        reservedBytes: numeric(row.reservedBytes),
+        reservations: Math.min(10000, numeric(row.reservations)),
+        adapterError: reasonCode(row.adapterError),
+      },
+    ];
+  });
 }
 
 type JsonObject = Record<string, unknown>;
@@ -166,6 +220,7 @@ export function parsePipelineSnapshot(
   );
   return {
     fresh: true,
+    trackerHealth: trackerHealth(raw.trackerHealth),
     clientAvailable: raw.clientAvailable !== false,
     generatedAt: new Date(at).toISOString(),
     records,
