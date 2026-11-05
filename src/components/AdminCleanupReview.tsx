@@ -1,4 +1,5 @@
 import Modal from '@app/components/Common/Modal';
+import { seedingCountdown } from '@app/utils/seedingCountdown';
 import { Transition } from '@headlessui/react';
 import {
   ArrowPathIcon,
@@ -9,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { useRouter } from 'next/router';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -32,7 +33,12 @@ type Review = {
     remainingBytes: number;
     checkedAt?: string;
     reason?: string;
-    torrents: { remainingSeconds?: number | null; reason?: string }[];
+    torrents: {
+      remainingSeconds?: number | null;
+      reason?: string;
+      seeding?: boolean;
+      torrentState?: string;
+    }[];
   } | null;
 };
 type Preview = {
@@ -61,12 +67,20 @@ export default function AdminCleanupReview({
 }) {
   const intl = useIntl();
   const french = intl.locale.startsWith('fr');
-  const t = (en: string, fr: string) => (french ? fr : en);
+  const t = useCallback(
+    (en: string, fr: string) => (french ? fr : en),
+    [french]
+  );
   const router = useRouter();
   const { data, error, mutate, isValidating } = useSWR<{
     reviews: Review[];
     manualCandidates: FutureCandidate[];
   }>('/api/v1/admin-tools/cleanup', { refreshInterval: 60000 });
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, []);
   const [tab, setTab] = useState<
     'pending' | 'kept' | 'future' | 'manual' | 'history' | 'seeding'
   >('pending');
@@ -130,7 +144,7 @@ export default function AdminCleanupReview({
           );
       });
     return () => controller.abort();
-  }, [selection]);
+  }, [selection, t]);
   const close = () => {
     if (busy) return;
     setSelection(null);
@@ -313,7 +327,7 @@ export default function AdminCleanupReview({
       </div>
       <div
         role="tabpanel"
-        className="mt-3 max-h-[34rem] space-y-3 overflow-y-auto"
+        className="mt-3 space-y-3 sm:max-h-[40rem] sm:overflow-y-auto"
       >
         {tab === 'manual' ? (
           <div className="space-y-3">
@@ -482,14 +496,73 @@ export default function AdminCleanupReview({
                     {review.sourceCleanup?.reason && (
                       <p className="mt-1">{review.sourceCleanup.reason}</p>
                     )}
-                    {review.sourceCleanup?.torrents.map((torrent, index) => (
-                      <p key={index} className="mt-1 text-xs text-amber-200">
-                        {typeof torrent.remainingSeconds === 'number' &&
-                        torrent.remainingSeconds > 0
-                          ? `${t('Seeding time remaining:', 'Durée de partage restante :')} ${Math.ceil(torrent.remainingSeconds / 3600)} ${t('hours', 'heures')}`
-                          : torrent.reason}
+                    {review.sourceCleanup?.checkedAt && (
+                      <p className="mt-2 text-xs text-gray-400">
+                        {t(
+                          'Source status checked:',
+                          'État de la source vérifié :'
+                        )}{' '}
+                        {new Date(
+                          review.sourceCleanup.checkedAt
+                        ).toLocaleString(intl.locale)}
                       </p>
-                    ))}
+                    )}
+                    {review.sourceCleanup?.torrents.map((torrent, index) => {
+                      const countdown = seedingCountdown(
+                        torrent.remainingSeconds,
+                        review.sourceCleanup?.checkedAt,
+                        torrent.seeding,
+                        now
+                      );
+                      return (
+                        <div
+                          key={index}
+                          className="mt-3 space-y-1 border-t border-amber-800/40 pt-2"
+                        >
+                          {countdown && countdown.seconds > 0 && (
+                            <p className="tabular-nums">
+                              {t(
+                                'Required seeding remaining:',
+                                'Partage obligatoire restant :'
+                              )}{' '}
+                              {Math.floor(
+                                Math.ceil(countdown.seconds / 60) / 60
+                              )}{' '}
+                              h {Math.ceil(countdown.seconds / 60) % 60} min
+                            </p>
+                          )}
+                          {countdown?.seconds === 0 && (
+                            <p>
+                              {t(
+                                'Time requirement satisfied. Other safety checks still apply.',
+                                'Durée requise atteinte. Les autres contrôles de sécurité restent applicables.'
+                              )}
+                            </p>
+                          )}
+                          {countdown &&
+                            !countdown.running &&
+                            countdown.seconds > 0 && (
+                              <p className="font-medium text-amber-200">
+                                {countdown.stale
+                                  ? t(
+                                      'Status is stale; waiting for a fresh worker check.',
+                                      'État ancien ; en attente d’une nouvelle vérification.'
+                                    )
+                                  : t(
+                                      'Seeding is not advancing. Remaining time only decreases while the torrent is actually seeding.',
+                                      'Le partage ne progresse pas. Le temps restant diminue uniquement lorsque le torrent partage effectivement.'
+                                    )}
+                                {torrent.torrentState
+                                  ? ` (${torrent.torrentState})`
+                                  : ''}
+                              </p>
+                            )}
+                          {torrent.reason && (
+                            <p className="break-words">{torrent.reason}</p>
+                          )}
+                        </div>
+                      );
+                    })}
                     {!review.sourceCleanup && (
                       <p className="mt-1 text-xs">
                         {t(

@@ -29,6 +29,22 @@ export interface DownloadingItem extends PipelineProgress {
   episode?: EpisodeNumberResult;
 }
 
+export function activeSonarrDownload(item: {
+  status: string;
+  trackedDownloadState: string;
+  sizeleft: number;
+  episode?: { hasFile?: boolean };
+}): boolean {
+  // A rejected replacement must not mask an episode already in the library.
+  // Active upgrades and any genuinely missing episode remain visible.
+  return !(
+    item.status === 'completed' &&
+    item.sizeleft === 0 &&
+    item.trackedDownloadState === 'importBlocked' &&
+    item.episode?.hasFile === true
+  );
+}
+
 class DownloadTracker {
   private radarrServers: Record<number, DownloadingItem[]> = {};
   private sonarrServers: Record<number, DownloadingItem[]> = {};
@@ -179,18 +195,28 @@ class DownloadTracker {
             await sonarr.refreshMonitoredDownloads();
             const queueItems = await sonarr.getQueue();
 
-            this.sonarrServers[server.id] = queueItems.map((item) => ({
-              externalId: item.seriesId,
-              estimatedCompletionTime: new Date(item.estimatedCompletionTime),
-              mediaType: MediaType.TV,
-              size: item.size,
-              sizeLeft: item.sizeleft,
-              status: item.status,
-              timeLeft: item.timeleft,
-              title: item.title,
-              episode: item.episode,
-              downloadId: item.downloadId,
-            }));
+            this.sonarrServers[server.id] = queueItems
+              .filter(activeSonarrDownload)
+              .map((item) => ({
+                externalId: item.seriesId,
+                estimatedCompletionTime: new Date(item.estimatedCompletionTime),
+                mediaType: MediaType.TV,
+                size: item.size,
+                sizeLeft: item.sizeleft,
+                status: item.status,
+                timeLeft: item.timeleft,
+                title: item.title,
+                episode: item.episode,
+                stage:
+                  item.trackedDownloadState === 'importBlocked'
+                    ? 'blocked'
+                    : undefined,
+                reason:
+                  item.trackedDownloadState === 'importBlocked'
+                    ? 'import-rejected'
+                    : undefined,
+                downloadId: item.downloadId,
+              }));
 
             if (queueItems.length > 0) {
               logger.debug(

@@ -1818,5 +1818,8 @@
   "pages.DiscoverAnime.hidden": "Les anime sont masqués pour ce profil.",
   "pages.DiscoverAnime.settings": "Afficher les anime dans les paramètres du profil",
   "components.Discover.continueWatching": "Reprendre la lecture",
-  "components.Discover.personalRecommendations": "Recommandé pour vous"
+  "components.Discover.personalRecommendations": "Recommandé pour vous",
+  "components.RequestPipelineStatus.trackerDenied": "Le tracker privé refuse l’accès ; vérifiez le compte ou choisissez une autre version",
+  "components.RequestPipelineStatus.trackersUnreachable": "Les trackers sont injoignables ; vérifiez leur connexion ou choisissez une autre version",
+  "components.RequestPipelineStatus.importRejected": "Import bloqué ; vérifiez la version et la correspondance des épisodes dans Sonarr"
 }

@@ -1,15 +1,18 @@
 import { getRepository } from '@server/datasource';
+import { ActivityEvent } from '@server/entity/ActivityEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import { WatchHistory, WatchHistoryStatus } from '@server/entity/WatchHistory';
 import { RETENTION_DAYS } from '@server/lib/cleanupPolicy';
 import { cleanupCandidates } from '@server/lib/cleanupReviews';
 import { Permission } from '@server/lib/permissions';
+import { playbackObservationStatus } from '@server/lib/playbackActivity';
 import { readPipelineSnapshot } from '@server/lib/requestPipeline';
 import { isAuthenticated } from '@server/middleware/auth';
 import { Router } from 'express';
 import { readdir, stat, statfs } from 'fs/promises';
 import path from 'path';
+import { z } from 'zod';
 
 const router = Router();
 router.get(
@@ -18,6 +21,67 @@ router.get(
   async (_req, res) => {
     res.setHeader('Cache-Control', 'private, no-store');
     res.json(await readPipelineSnapshot());
+  }
+);
+router.get(
+  '/activity',
+  isAuthenticated(Permission.ADMIN),
+  async (req, res, next) => {
+    try {
+      const input = z
+        .object({
+          userId: z.coerce.number().int().positive().optional(),
+          before: z.coerce.number().int().positive().optional(),
+          category: z
+            .enum([
+              'playback',
+              'request',
+              'watchlist',
+              'watch-history',
+              'cleanup',
+              'account',
+              'user',
+              'settings',
+              'blocklist',
+              'issue',
+              'issueComment',
+              'party',
+            ])
+            .optional(),
+          take: z.coerce.number().int().min(1).max(100).default(50),
+        })
+        .parse(req.query);
+      const query = getRepository(ActivityEvent)
+        .createQueryBuilder('event')
+        .orderBy('event.id', 'DESC')
+        .take(input.take + 1);
+      if (input.userId)
+        query.andWhere('event.userId = :userId', { userId: input.userId });
+      if (input.category)
+        query.andWhere('event.category = :category', {
+          category: input.category,
+        });
+      if (input.before)
+        query.andWhere('event.id < :before', { before: input.before });
+      const rows = await query.getMany();
+      const hasMore = rows.length > input.take;
+      const events = rows
+        .slice(0, input.take)
+        .map((row) => ({ ...row, details: JSON.parse(row.details) }));
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.json({
+        events,
+        next: hasMore ? events.at(-1)?.id : null,
+        retentionDays: 90,
+        pollingSeconds: 5,
+        observation: playbackObservationStatus(),
+      });
+    } catch (error) {
+      next({
+        status: error instanceof z.ZodError ? 400 : 503,
+        message: 'Activity history could not be loaded.',
+      });
+    }
   }
 );
 let diskCache:

@@ -20,6 +20,12 @@ const messages = defineMessages('components.RequestPipelineStatus', {
   episode: 'Episode {episode} of {total}',
   elapsed:
     '{minutes, plural, =0 {Under a minute} one {# minute} other {# minutes}}',
+  importRejected:
+    'Import blocked; review the release and episode mapping in Sonarr',
+  trackerDenied:
+    'Private tracker rejected access; check the tracker account or choose another release',
+  trackersUnreachable:
+    'Trackers are unreachable; check their connectivity or choose another release',
   searchDelayed: 'Search is taking longer than usual',
   noProgress: 'No recent download progress',
   importDelayed: 'Download complete; import is delayed',
@@ -29,6 +35,9 @@ const messages = defineMessages('components.RequestPipelineStatus', {
   downloadError: 'Download client reported an error',
 });
 const reasonMessages = {
+  'import-rejected': messages.importRejected,
+  'tracker-access-denied': messages.trackerDenied,
+  'trackers-unreachable': messages.trackersUnreachable,
   'search-delayed': messages.searchDelayed,
   'no-transfer-progress': messages.noProgress,
   'import-delayed': messages.importDelayed,

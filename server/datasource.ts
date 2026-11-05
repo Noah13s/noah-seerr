@@ -1,3 +1,4 @@
+import { ActivityEvent } from '@server/entity/ActivityEvent';
 import { Blocklist } from '@server/entity/Blocklist';
 import { CleanupReview } from '@server/entity/CleanupReview';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
@@ -27,6 +28,7 @@ import { DataSource } from 'typeorm';
 const DB_SSL_PREFIX = 'DB_SSL_';
 
 const entities = [
+  ActivityEvent,
   Blocklist,
   CleanupReview,
   DiscoverSlider,
