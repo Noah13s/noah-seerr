@@ -68,10 +68,10 @@ export async function observePlayback() {
         position: Math.max(0, Number(play.PositionTicks || 0) / 10000000),
         paused: !!play.IsPaused,
         title: activityText(
-          `${item.SeriesName ? item.SeriesName + ' Â· S' + item.ParentIndexNumber + ' E' + item.IndexNumber + ' Â· ' : ''}${item.Name || ''}`
+          `${item.SeriesName ? item.SeriesName + ' \u00b7 S' + item.ParentIndexNumber + ' E' + item.IndexNumber + ' \u00b7 ' : ''}${item.Name || ''}`
         ),
         device: activityText(
-          `${session.DeviceName || 'Unknown device'} Â· ${session.Client || ''}`
+          `${session.DeviceName || 'Unknown device'} \u00b7 ${session.Client || ''}`
         ),
         audio: language('Audio', play.AudioStreamIndex),
         subtitle: language('Subtitle', play.SubtitleStreamIndex),

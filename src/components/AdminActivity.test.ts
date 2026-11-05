@@ -13,7 +13,8 @@ const users = [{ id: 1, name: 'Fixture user' }];
 function render(
   component: ReactElement,
   fallback: Record<string, unknown>,
-  locale = 'en'
+  locale = 'en',
+  query: Record<string, string> = {}
 ) {
   return renderToStaticMarkup(
     createElement(
@@ -21,7 +22,7 @@ function render(
       { value: { provider: () => new Map(), fallback } },
       createElement(
         RouterContext.Provider,
-        { value: { pathname: '/admin-tools', query: {} } as NextRouter },
+        { value: { pathname: '/admin-tools', query } as NextRouter },
         createElement(IntlProvider, { locale, messages: {} }, component)
       )
     )
@@ -131,4 +132,19 @@ test('admin overview uses full width, separates panels and does not load hidden 
     }),
     ''
   );
+});
+
+test('existing cleanup approval email links open the cleanup section directly', () => {
+  const html = render(
+    createElement(AdminToolsPage),
+    {
+      '/api/v1/auth/me': { id: 1, permissions: 2 },
+      '/api/v1/admin-tools/cleanup': { reviews: [], manualCandidates: [] },
+    },
+    'en',
+    { review: 'fixture-review' }
+  );
+  assert.match(html, /Cleanup approvals/);
+  assert.match(html, /Source cleanup/);
+  assert.doesNotMatch(html, /<iframe/);
 });

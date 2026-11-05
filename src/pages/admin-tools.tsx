@@ -14,7 +14,8 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import type { NextPage } from 'next';
-import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -128,7 +129,13 @@ const AdminToolsPage: NextPage = () => {
   const { user, hasPermission } = useUser();
   const intl = useIntl();
   const french = intl.locale.startsWith('fr');
-  const [section, setSection] = useState('overview');
+  const router = useRouter();
+  const review =
+    typeof router.query.review === 'string' ? router.query.review : undefined;
+  const [section, setSection] = useState(review ? 'cleanup' : 'overview');
+  useEffect(() => {
+    if (review) setSection('cleanup');
+  }, [review]);
   const [active, setActive] = useState(services[0]);
   const {
     data: insights,

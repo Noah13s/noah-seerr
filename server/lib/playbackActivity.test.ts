@@ -35,6 +35,9 @@ test('observer uses only GET, maps account IDs, captures tracks and ignores a fa
     const item = {
       Id: 'fixture-item',
       Name: 'Observer fixture',
+      SeriesName: 'Series fixture',
+      ParentIndexNumber: 2,
+      IndexNumber: 3,
       MediaStreams: [
         { Type: 'Audio', Index: 1, Language: 'jpn' },
         { Type: 'Audio', Index: 2, Language: 'fra' },
@@ -91,6 +94,11 @@ test('observer uses only GET, maps account IDs, captures tracks and ignores a fa
       ]
     );
     assert.ok(events.every((e) => e.userId === user.id));
+    assert.equal(
+      events[0].title,
+      'Series fixture \u00b7 S2 E3 \u00b7 Observer fixture'
+    );
+    assert.equal(events[0].device, 'Fixture TV \u00b7 Noah Stream');
     assert.ok(methods.every((m) => m === 'GET'));
     assert.ok(events.some((e) => e.details.includes('fra')));
   } finally {
