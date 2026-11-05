@@ -1,4 +1,6 @@
-import downloadTracker from '@server/lib/downloadtracker';
+import downloadTracker, {
+  activeSonarrDownload,
+} from '@server/lib/downloadtracker';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
@@ -92,4 +94,27 @@ test('download synchronization waits for both Arr queues and preserves matching-
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+});
+
+test('a rejected completed replacement cannot mask available episodes as importing', () => {
+  const old = {
+    status: 'completed',
+    sizeleft: 0,
+    trackedDownloadState: 'importBlocked',
+    episode: { hasFile: true },
+  };
+  assert.equal(activeSonarrDownload(old), false);
+  assert.equal(
+    activeSonarrDownload({ ...old, episode: { hasFile: false } }),
+    true
+  );
+  assert.equal(activeSonarrDownload({ ...old, episode: undefined }), true);
+  assert.equal(
+    activeSonarrDownload({ ...old, sizeleft: 10, status: 'downloading' }),
+    true
+  );
+  assert.equal(
+    activeSonarrDownload({ ...old, trackedDownloadState: 'importPending' }),
+    true
+  );
 });

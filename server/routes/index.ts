@@ -9,8 +9,10 @@ import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import type { StatusResponse } from '@server/interfaces/api/settingsInterfaces';
 import { Permission } from '@server/lib/permissions';
+import { startPlaybackActivity } from '@server/lib/playbackActivity';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { auditMutations } from '@server/middleware/activity';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import deprecatedRoute from '@server/middleware/deprecation';
 import { mapProductionCompany } from '@server/models/Movie';
@@ -53,6 +55,11 @@ import watchHistoryRoutes from './watchHistory';
 const router = Router();
 
 router.use(checkUser);
+router.use(auditMutations);
+router.use((_req, _res, next) => {
+  startPlaybackActivity();
+  next();
+});
 
 router.get<unknown, StatusResponse>('/status', async (req, res) => {
   const settings = getSettings();
@@ -169,6 +176,7 @@ router.use('/request', isAuthenticated(), requestRoutes);
 router.use('/watchlist', isAuthenticated(), watchlistRoutes);
 router.use('/watch-history', isAuthenticated(), watchHistoryRoutes);
 router.use('/cleanup-reviews', isAuthenticated(), cleanupReviewRoutes);
+router.use('/admin-tools/cleanup', cleanupReviewRoutes);
 router.use('/admin-tools', adminInsightsRoutes);
 router.use('/blocklist', isAuthenticated(), blocklistRoutes);
 router.use(

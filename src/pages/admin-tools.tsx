@@ -1,3 +1,4 @@
+import AdminActivity from '@app/components/AdminActivity';
 import AdminCleanupReview from '@app/components/AdminCleanupReview';
 import AdminRequestPipeline from '@app/components/AdminRequestPipeline';
 import Header from '@app/components/Common/Header';
@@ -61,11 +62,13 @@ const DiskCard = ({
   total,
   free,
   accent,
+  french,
 }: {
   title: string;
   total: number;
   free: number;
   accent: string;
+  french: boolean;
 }) => {
   const used = Math.max(0, total - free);
   const percentage = total ? Math.round((used / total) * 100) : 0;
@@ -82,8 +85,12 @@ const DiskCard = ({
         />
       </div>
       <div className="mt-2 flex justify-between text-xs text-gray-300">
-        <span>{formatBytes(used)} used</span>
-        <span>{formatBytes(free)} free</span>
+        <span>
+          {formatBytes(used)} {french ? 'utilisés' : 'used'}
+        </span>
+        <span>
+          {formatBytes(free)} {french ? 'libres' : 'free'}
+        </span>
       </div>
     </div>
   );
@@ -121,6 +128,7 @@ const AdminToolsPage: NextPage = () => {
   const { user, hasPermission } = useUser();
   const intl = useIntl();
   const french = intl.locale.startsWith('fr');
+  const [section, setSection] = useState('overview');
   const [active, setActive] = useState(services[0]);
   const {
     data: insights,
@@ -137,183 +145,241 @@ const AdminToolsPage: NextPage = () => {
   if (!user || !hasPermission(Permission.ADMIN)) return null;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-24 pt-6 sm:px-6">
+    <div className="mx-auto w-full max-w-[1600px] pb-24 pt-6 sm:px-2 xl:px-6">
       <Header>{french ? 'Outils administrateur' : 'Admin tools'}</Header>
       <p className="mt-2 text-sm text-gray-300">
         {french
           ? 'Gérez vos médias, indexeurs et téléchargements ici.'
           : 'Manage media, indexers and downloads here.'}
       </p>
-      <AdminRequestPipeline />
-      <section aria-label="Media insights" className="mt-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-white">Media insights</h2>
-          <button
-            type="button"
-            onClick={() => refreshInsights()}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-600 px-3 text-xs text-gray-200 hover:bg-gray-700"
-          >
-            <ArrowPathIcon
-              className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`}
-            />{' '}
-            Refresh
-          </button>
-        </div>
-        {insightsError && (
-          <p
-            role="alert"
-            className="rounded-lg border border-red-700 bg-red-950/40 p-3 text-sm text-red-200"
-          >
-            Unable to load media insights.
-          </p>
-        )}
-        {insights && (
-          <>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {[
-                ['Users', insights.totals.users],
-                ['Requests', insights.totals.requests],
-                ['Watched titles', insights.totals.watched],
-                ['In progress', insights.totals.watching],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-xl border border-gray-700 bg-gradient-to-br from-gray-800 to-gray-900 p-4"
-                >
-                  <div className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                    {label}
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-white">
-                    {value}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-gray-700 bg-gray-900/60 p-4">
-                <h3 className="mb-3 flex items-center gap-2 font-semibold text-white">
-                  <CircleStackIcon className="h-5 w-5 text-indigo-300" /> Disk
-                  space
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  {insights.disk.volumes.map((volume) => (
-                    <DiskCard
-                      key={volume.mount}
-                      title={
-                        volume.mount === '/media'
-                          ? 'Media drive'
-                          : 'System drive'
-                      }
-                      total={volume.total}
-                      free={volume.free}
-                      accent={
-                        volume.mount === '/media'
-                          ? 'bg-emerald-500'
-                          : volume.total && volume.free / volume.total < 0.15
-                            ? 'bg-rose-500'
-                            : 'bg-indigo-500'
-                      }
-                    />
-                  ))}
-                </div>
-                <div className="mt-4 space-y-2 border-t border-gray-700 pt-3">
-                  {insights.disk.libraries.map((library) => (
-                    <div
-                      key={library.name}
-                      className="flex justify-between text-sm"
-                    >
-                      <span className="capitalize text-gray-300">
-                        {library.name}
-                      </span>
-                      <span className="font-medium text-white">
-                        {formatBytes(library.bytes)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-xl border border-gray-700 bg-gray-900/60 p-4">
-                <h3 className="mb-3 flex items-center gap-2 font-semibold text-white">
-                  <UsersIcon className="h-5 w-5 text-indigo-300" /> Watch
-                  activity by user
-                </h3>
-                <div className="max-h-72 space-y-2 overflow-y-auto">
-                  {insights.users.map((profile) => (
-                    <div
-                      key={profile.id}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-gray-800/80 px-3 py-2"
-                    >
-                      <span className="min-w-0 truncate text-sm font-medium text-white">
-                        {profile.name}
-                      </span>
-                      <span className="shrink-0 text-xs text-gray-300">
-                        {profile.completed} watched · {profile.watching}{' '}
-                        watching · {profile.requests} requests
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </section>
-      <AdminCleanupReview
-        candidates={insights?.candidates}
-        onChanged={() => {
-          void refreshInsights();
-        }}
-      />
-      <div
-        role="tablist"
-        aria-label="Administrative services"
-        className="mt-5 flex gap-2 overflow-x-auto pb-2"
+      <nav
+        aria-label={french ? 'Sections administrateur' : 'Admin sections'}
+        className="my-6 grid grid-cols-2 gap-2 rounded-xl border border-gray-700 bg-gray-900/90 p-2 sm:flex sm:flex-wrap"
       >
-        {services.map(({ name, path, description, icon: Icon }) => (
+        {[
+          ['overview', french ? 'Vue d’ensemble' : 'Overview'],
+          ['monitoring', french ? 'Suivi des demandes' : 'Request monitoring'],
+          ['cleanup', french ? 'Nettoyage' : 'Cleanup approvals'],
+          ['activity', french ? 'Historique d’activité' : 'Activity history'],
+          ['services', 'Services'],
+        ].map(([id, label]) => (
           <button
-            key={name}
+            key={id}
             type="button"
-            role="tab"
-            aria-selected={active.path === path}
-            aria-controls="admin-service-panel"
-            onClick={() =>
-              setActive(
-                services.find((service) => service.path === path) ?? services[0]
-              )
-            }
-            title={description}
-            className={`flex h-11 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 ${active.path === path ? 'border-indigo-400 bg-indigo-600 text-white' : 'border-gray-600 bg-gray-800 text-gray-200 hover:border-gray-400 hover:bg-gray-700'}`}
+            aria-current={section === id ? 'page' : undefined}
+            onClick={() => setSection(id)}
+            className={`min-h-11 shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300 ${section === id ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
           >
-            <Icon className="h-5 w-5" />
-            {name}
+            {label}
           </button>
         ))}
-      </div>
-      <div
-        id="admin-service-panel"
-        role="tabpanel"
-        className="mt-2 overflow-hidden rounded-xl border border-gray-600 bg-gray-900"
-      >
-        <div className="flex items-center justify-between border-b border-gray-700 px-3 py-2 sm:px-4">
-          <span className="font-medium text-white">{active.name}</span>
-          <a
-            href={active.path}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-indigo-200 hover:text-white"
-          >
-            {french ? 'Ouvrir en plein écran' : 'Open full screen'}
-            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-          </a>
-        </div>
-        <iframe
-          key={active.path}
-          src={active.path}
-          title={active.name}
-          className="h-[calc(100dvh-15rem)] min-h-[28rem] w-full bg-gray-900"
-          referrerPolicy="same-origin"
+      </nav>
+      {section === 'monitoring' && <AdminRequestPipeline />}
+      {section === 'activity' && (
+        <AdminActivity users={insights?.users ?? []} />
+      )}
+      {section === 'overview' && (
+        <>
+          <section aria-label="Media insights" className="mt-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold text-white">
+                {french ? 'Statistiques des médias' : 'Media insights'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => refreshInsights()}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-600 px-3 text-xs text-gray-200 hover:bg-gray-700"
+              >
+                <ArrowPathIcon
+                  className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`}
+                />{' '}
+                {french ? 'Actualiser' : 'Refresh'}
+              </button>
+            </div>
+            {insightsError && (
+              <p
+                role="alert"
+                className="rounded-lg border border-red-700 bg-red-950/40 p-3 text-sm text-red-200"
+              >
+                {french
+                  ? 'Impossible de charger les statistiques.'
+                  : 'Unable to load media insights.'}
+              </p>
+            )}
+            {insights && (
+              <>
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  {[
+                    [french ? 'Utilisateurs' : 'Users', insights.totals.users],
+                    [
+                      french ? 'Demandes' : 'Requests',
+                      insights.totals.requests,
+                    ],
+                    [
+                      french ? 'Titres terminés' : 'Watched titles',
+                      insights.totals.watched,
+                    ],
+                    [
+                      french ? 'En cours' : 'In progress',
+                      insights.totals.watching,
+                    ],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-xl border border-gray-700 bg-gradient-to-br from-gray-800 to-gray-900 p-4"
+                    >
+                      <div className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                        {label}
+                      </div>
+                      <div className="mt-2 text-2xl font-bold text-white">
+                        {value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl border border-gray-700 bg-gray-900/60 p-4">
+                    <h3 className="mb-3 flex items-center gap-2 font-semibold text-white">
+                      <CircleStackIcon className="h-5 w-5 text-indigo-300" />{' '}
+                      {french ? 'Espace disque' : 'Disk space'}
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                      {insights.disk.volumes.map((volume) => (
+                        <DiskCard
+                          key={volume.mount}
+                          title={
+                            volume.mount === '/media'
+                              ? french
+                                ? 'Disque des médias'
+                                : 'Media drive'
+                              : french
+                                ? 'Disque système'
+                                : 'System drive'
+                          }
+                          french={french}
+                          total={volume.total}
+                          free={volume.free}
+                          accent={
+                            volume.mount === '/media'
+                              ? 'bg-emerald-500'
+                              : volume.total &&
+                                  volume.free / volume.total < 0.15
+                                ? 'bg-rose-500'
+                                : 'bg-indigo-500'
+                          }
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-4 space-y-2 border-t border-gray-700 pt-3">
+                      {insights.disk.libraries.map((library) => (
+                        <div
+                          key={library.name}
+                          className="flex justify-between text-sm"
+                        >
+                          <span className="capitalize text-gray-300">
+                            {library.name}
+                          </span>
+                          <span className="font-medium text-white">
+                            {formatBytes(library.bytes)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-gray-700 bg-gray-900/60 p-4">
+                    <h3 className="mb-3 flex items-center gap-2 font-semibold text-white">
+                      <UsersIcon className="h-5 w-5 text-indigo-300" />{' '}
+                      {french
+                        ? 'Visionnage par utilisateur'
+                        : 'Watch activity by user'}
+                    </h3>
+                    <div className="max-h-72 space-y-2 overflow-y-auto">
+                      {insights.users.map((profile) => (
+                        <div
+                          key={profile.id}
+                          className="flex flex-col gap-2 rounded-lg bg-gray-800/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <span className="min-w-0 truncate text-sm font-medium text-white">
+                            {profile.name}
+                          </span>
+                          <span className="text-xs text-gray-300 sm:shrink-0">
+                            {french
+                              ? `${profile.completed} terminés · ${profile.watching} en cours · ${profile.requests} demandes`
+                              : `${profile.completed} watched · ${profile.watching} watching · ${profile.requests} requests`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </>
+      )}
+      {section === 'cleanup' && (
+        <AdminCleanupReview
+          candidates={insights?.candidates}
+          onChanged={() => {
+            void refreshInsights();
+          }}
         />
-      </div>
+      )}
+      {section === 'services' && (
+        <>
+          <div
+            role="tablist"
+            aria-label="Administrative services"
+            className="mt-5 flex gap-2 overflow-x-auto pb-2"
+          >
+            {services.map(({ name, path, description, icon: Icon }) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                aria-selected={active.path === path}
+                aria-controls="admin-service-panel"
+                onClick={() =>
+                  setActive(
+                    services.find((service) => service.path === path) ??
+                      services[0]
+                  )
+                }
+                title={description}
+                className={`flex h-11 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 ${active.path === path ? 'border-indigo-400 bg-indigo-600 text-white' : 'border-gray-600 bg-gray-800 text-gray-200 hover:border-gray-400 hover:bg-gray-700'}`}
+              >
+                <Icon className="h-5 w-5" />
+                {name}
+              </button>
+            ))}
+          </div>
+          <div
+            id="admin-service-panel"
+            role="tabpanel"
+            className="mt-2 overflow-hidden rounded-xl border border-gray-600 bg-gray-900"
+          >
+            <div className="flex items-center justify-between border-b border-gray-700 px-3 py-2 sm:px-4">
+              <span className="font-medium text-white">{active.name}</span>
+              <a
+                href={active.path}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-200 hover:text-white"
+              >
+                {french ? 'Ouvrir en plein écran' : 'Open full screen'}
+                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+              </a>
+            </div>
+            <iframe
+              key={active.path}
+              src={active.path}
+              title={active.name}
+              className="h-[calc(100dvh-15rem)] min-h-[28rem] w-full bg-gray-900"
+              referrerPolicy="same-origin"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };

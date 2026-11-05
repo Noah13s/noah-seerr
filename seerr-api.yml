@@ -2251,6 +2251,27 @@ paths:
           description: Sanitized request stages and monitor freshness
         '403':
           description: Administrator permission required
+  /admin-tools/activity:
+    get:
+      summary: Get administrator activity history
+      parameters:
+        - in: query
+          name: take
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - in: query
+          name: before
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: userId
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: category
+          schema: { type: string }
+      responses:
+        '200':
+          description: Private paginated activity history
+        '403':
+          description: Administrator required
   /admin-tools/insights:
     get:
       summary: Get administrator watch, disk, and cleanup preview insights
