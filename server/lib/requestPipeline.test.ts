@@ -90,6 +90,45 @@ test('stale monitor files cannot advertise fresh account credit', () => {
   assert.equal(result.trackerHealth, undefined);
 });
 
+test('account observations retain health signals and discard cookies, passwords and untrusted warnings', () => {
+  const result = parsePipelineSnapshot(
+    {
+      version: 1,
+      generatedAt: new Date(now).toISOString(),
+      trackerHealth: [
+        {
+          id: 'draupnirr',
+          name: 'Draupnirr',
+          monitored: true,
+          healthFresh: true,
+          healthCheckedAt: new Date(now).toISOString(),
+          health: {
+            source: 'api',
+            ratio: null,
+            freeleech: true,
+            hnrCount: 2,
+            credits: 1234,
+            warnings: ['hit-and-run', 'PRIVATE'],
+            password: 'PRIVATE',
+            cookie: 'PRIVATE',
+            api_key: 'PRIVATE',
+          },
+        },
+      ],
+    },
+    now
+  );
+  const row = result.trackerHealth?.[0];
+  assert.equal(row?.monitored, true);
+  assert.equal(row?.health?.ratio, null);
+  assert.equal(row?.health?.hnrCount, 2);
+  assert.deepEqual(row?.health?.warnings, ['hit-and-run']);
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /PRIVATE|cookie|password|api_key/
+  );
+});
+
 test('real search progress exists before a torrent and remains scoped by service, media and season', () => {
   const data = snapshot();
   const result = mergePipelineProgress([], data, 'tv', 0, 14);
