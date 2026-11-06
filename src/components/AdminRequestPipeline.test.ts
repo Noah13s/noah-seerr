@@ -111,6 +111,82 @@ test('administrator overview keeps slow searches and retained attempts distinct'
   assert.doesNotMatch(html, /NaN|undefined|apiKey/);
 });
 
+test('monitor-only accounts show source, obligations and unavailable access without claiming availability', () => {
+  const data: PipelineSnapshot = {
+    ...snapshot,
+    trackerHealth: [
+      {
+        id: 'tr4ker',
+        name: 'TR4KER',
+        budgeted: false,
+        fresh: true,
+        monitored: true,
+        healthFresh: true,
+        reservedBytes: 0,
+        reservations: 0,
+        health: {
+          source: 'api',
+          ratio: 0.57,
+          bufferBytes: 17_000_000_000,
+          warnings: ['ratio-low'],
+        },
+      },
+      {
+        id: 'draupnirr',
+        name: 'Draupnirr',
+        budgeted: false,
+        fresh: false,
+        monitored: true,
+        healthFresh: true,
+        reservedBytes: 0,
+        reservations: 0,
+        health: {
+          source: 'api',
+          ratio: null,
+          freeleech: true,
+          hnrCount: 2,
+          warnings: ['hit-and-run'],
+        },
+      },
+      {
+        id: 'crazyspirits',
+        name: 'CrazySpirits',
+        budgeted: false,
+        fresh: false,
+        monitored: true,
+        healthFresh: false,
+        reservedBytes: 0,
+        reservations: 0,
+        adapterError: 'website-challenge-required',
+      },
+      {
+        id: 'astratorrent',
+        name: 'AstraTorrent',
+        budgeted: false,
+        fresh: false,
+        monitored: true,
+        healthFresh: true,
+        reservedBytes: 0,
+        reservations: 0,
+        health: { source: 'website', slotsUnlimited: true, activeContracts: 0 },
+      },
+    ],
+  };
+  const english = render(data);
+  assert.match(english, /TR4KER/);
+  assert.match(english, /Ratio approaching/);
+  assert.match(english, /Outstanding seeding obligations/);
+  assert.match(english, /Cloudflare verification required/);
+  assert.match(english, /approximate counters/);
+  assert.match(english, /∞/);
+  assert.doesNotMatch(english, />Available</);
+  const fr = render(data, 'fr');
+  assert.match(fr, /Validation Cloudflare requise/);
+  assert.match(fr, /surveillé/);
+  assert.doesNotMatch(fr, /Ã|Â|�|NaN|undefined/);
+  assert.equal(render(data, 'fr', 0), '');
+});
+
 test('French administrators see stale-monitor warnings and an empty retained list', () => {
   const html = render(
     { fresh: false, generatedAt: snapshot.generatedAt, records: [], jobs: [] },

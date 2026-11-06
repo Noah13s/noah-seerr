@@ -61,6 +61,71 @@ export interface TrackerHealth {
   reservedBytes: number;
   reservations: number;
   adapterError?: string;
+  monitored?: boolean;
+  healthFresh?: boolean;
+  healthCheckedAt?: string;
+  health?: TrackerAccountDetails;
+}
+
+export interface TrackerAccountDetails {
+  source?: 'api' | 'website';
+  ratio?: number | null;
+  credits?: number;
+  bufferBytes?: number;
+  freeleech?: boolean;
+  freeleechUntil?: string;
+  hnrCount?: number;
+  seedCount?: number;
+  activeContracts?: number;
+  slotsUnlimited?: boolean;
+  slotLimit?: number;
+  warnings?: string[];
+}
+
+const accountWarnings = new Set([
+  'ratio-low',
+  'hit-and-run',
+  'account-warning',
+  'automation-disabled',
+  'seed-contracts',
+  'acknowledgements-required',
+]);
+function accountDetails(value: unknown): TrackerAccountDetails {
+  const row = object(value) || {};
+  const result: TrackerAccountDetails = {};
+  if (row.source === 'api' || row.source === 'website')
+    result.source = row.source;
+  if (row.ratio === null) result.ratio = null;
+  else if (
+    typeof row.ratio === 'number' &&
+    Number.isFinite(row.ratio) &&
+    row.ratio >= 0
+  )
+    result.ratio = row.ratio;
+  for (const key of [
+    'credits',
+    'hnrCount',
+    'seedCount',
+    'activeContracts',
+    'slotLimit',
+  ] as const) {
+    const value = row[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0)
+      result[key] = value;
+  }
+  if (
+    typeof row.bufferBytes === 'number' &&
+    Number.isSafeInteger(row.bufferBytes)
+  )
+    result.bufferBytes = row.bufferBytes;
+  if (typeof row.freeleech === 'boolean') result.freeleech = row.freeleech;
+  if (typeof row.slotsUnlimited === 'boolean')
+    result.slotsUnlimited = row.slotsUnlimited;
+  result.freeleechUntil = date(row.freeleechUntil);
+  result.warnings = (Array.isArray(row.warnings) ? row.warnings : [])
+    .filter((v): v is string => typeof v === 'string' && accountWarnings.has(v))
+    .slice(0, 6);
+  return result;
 }
 
 function trackerHealth(value: unknown): TrackerHealth[] {
@@ -97,6 +162,10 @@ function trackerHealth(value: unknown): TrackerHealth[] {
         reservedBytes: numeric(row.reservedBytes),
         reservations: Math.min(10000, numeric(row.reservations)),
         adapterError: reasonCode(row.adapterError),
+        monitored: row.monitored === true,
+        healthFresh: row.healthFresh === true,
+        healthCheckedAt: date(row.healthCheckedAt),
+        health: accountDetails(row.health),
       },
     ];
   });
