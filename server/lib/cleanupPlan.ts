@@ -6,6 +6,7 @@ import axios, { type AxiosInstance } from 'axios';
 import path from 'path';
 import type { CleanupCandidate } from './cleanupPolicy';
 import { digest } from './cleanupPolicy';
+import { cleanupQueueBlocks, type CleanupQueue } from './cleanupQueue';
 
 export interface CleanupFile {
   kind: 'radarr' | 'sonarr';
@@ -178,23 +179,39 @@ export async function assertCleanupIdle(
     ])
   );
   for (const file of groups.values()) {
-    const { data: queue } = await clientFactory(file.kind, file.serverId).get<{
-      totalRecords: number;
-      records: { movieId?: number; seriesId?: number }[];
-    }>('/queue', {
+    const client = clientFactory(file.kind, file.serverId);
+    const { data: queue } = await client.get<CleanupQueue>('/queue', {
       params: {
         pageSize: 1000,
         includeUnknownMovieItems: true,
         includeUnknownSeriesItems: true,
       },
     });
+    // Verify current episode files rather than trusting the retained queue's
+    // embedded episode snapshot or an earlier cleanup review.
+    const episodes =
+      file.kind === 'sonarr'
+        ? (
+            await client.get<ArrEpisode[]>('/episode', {
+              params: { seriesId: file.itemId },
+            })
+          ).data
+        : [];
+    const targetEpisodeIds = plan.files
+      .filter(
+        (entry) =>
+          entry.kind === file.kind &&
+          entry.serverId === file.serverId &&
+          entry.itemId === file.itemId
+      )
+      .flatMap((entry) => entry.episodeIds);
     if (
-      !Array.isArray(queue.records) ||
-      queue.totalRecords > queue.records.length ||
-      queue.records.some(
-        (record) =>
-          (file.kind === 'radarr' ? record.movieId : record.seriesId) ===
-          file.itemId
+      cleanupQueueBlocks(
+        queue,
+        file.kind,
+        file.itemId,
+        episodes,
+        targetEpisodeIds
       )
     ) {
       throw new Error(

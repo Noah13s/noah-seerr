@@ -1,5 +1,6 @@
 import CachedImage from '@app/components/Common/CachedImage';
 import MiniQuotaDisplay from '@app/components/Layout/UserDropdown/MiniQuotaDisplay';
+import { usePWAInstall } from '@app/context/PWAInstallContext';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { unsubscribeToPushNotifications } from '@app/utils/pushSubscriptionHelpers';
@@ -11,6 +12,7 @@ import {
   Transition,
 } from '@headlessui/react';
 import {
+  ArrowDownTrayIcon,
   ArrowRightOnRectangleIcon,
   ClockIcon,
   QrCodeIcon,
@@ -33,6 +35,7 @@ const messages = defineMessages('components.Layout.UserDropdown', {
   settings: 'Settings',
   requests: 'Requests',
   signout: 'Sign Out',
+  install: 'Install app',
 });
 
 const ForwardedLink = forwardRef<
@@ -51,6 +54,7 @@ ForwardedLink.displayName = 'ForwardedLink';
 const UserDropdown = () => {
   const intl = useIntl();
   const { user, revalidate, hasPermission } = useUser();
+  const { installed, installing, install } = usePWAInstall();
 
   const logout = async () => {
     const cleanUpPushSubscription = async () => {
@@ -145,6 +149,21 @@ const UserDropdown = () => {
               {user && <MiniQuotaDisplay userId={user?.id} />}
             </div>
             <div className="p-1">
+              {!installed && (
+                <MenuItem disabled={installing}>
+                  {({ active }) => (
+                    <button
+                      type="button"
+                      onClick={install}
+                      data-testid="user-menu-install-app"
+                      className={`flex w-full items-center rounded px-4 py-2 text-sm font-medium text-gray-200 ${active ? 'bg-indigo-600 text-white' : ''}`}
+                    >
+                      <ArrowDownTrayIcon className="mr-2 h-5 w-5 shrink-0" />
+                      <span>{intl.formatMessage(messages.install)}</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
               <Menu.Item>
                 {({ active }) => (
                   <ForwardedLink

@@ -1,13 +1,9 @@
 import Button from '@app/components/Common/Button';
+import { usePWAInstall } from '@app/context/PWAInstallContext';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
 
 const messages = defineMessages('components.PWAInstallPrompt', {
   title: 'Install Noah Stream',
@@ -21,42 +17,27 @@ const DISMISS_DURATION = 14 * 24 * 60 * 60 * 1000;
 
 const PWAInstallPrompt = () => {
   const intl = useIntl();
-  const [installPrompt, setInstallPrompt] =
-    useState<BeforeInstallPromptEvent>();
+  const { canPrompt, installed, installing, install } = usePWAInstall();
+  const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      ('standalone' in navigator &&
-        (navigator as Navigator & { standalone?: boolean }).standalone);
-    const dismissedAt = Number(localStorage.getItem(DISMISSED_AT_KEY) ?? 0);
-
-    if (standalone || Date.now() - dismissedAt < DISMISS_DURATION) return;
-
-    const handleInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
-    return () =>
-      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+    try {
+      const dismissedAt = Number(localStorage.getItem(DISMISSED_AT_KEY) ?? 0);
+      setDismissed(Date.now() - dismissedAt < DISMISS_DURATION);
+    } catch {
+      setDismissed(false);
+    }
   }, []);
 
-  if (!installPrompt) return null;
+  if (!canPrompt || installed || dismissed) return null;
 
   const dismiss = () => {
-    localStorage.setItem(DISMISSED_AT_KEY, String(Date.now()));
-    setInstallPrompt(undefined);
-  };
-
-  const install = async () => {
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    if (choice.outcome === 'dismissed') {
+    try {
       localStorage.setItem(DISMISSED_AT_KEY, String(Date.now()));
+    } catch {
+      // Dismissing still works when browser storage is unavailable.
     }
-    setInstallPrompt(undefined);
+    setDismissed(true);
   };
 
   return (
@@ -78,7 +59,12 @@ const PWAInstallPrompt = () => {
         </p>
       </div>
       <div className="mt-3 flex gap-2">
-        <Button buttonType="primary" buttonSize="sm" onClick={install}>
+        <Button
+          buttonType="primary"
+          buttonSize="sm"
+          onClick={install}
+          disabled={installing}
+        >
           <ArrowDownTrayIcon />
           <span>{intl.formatMessage(messages.install)}</span>
         </Button>

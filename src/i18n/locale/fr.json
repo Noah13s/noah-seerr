@@ -1,4 +1,10 @@
 {
+  "components.Layout.UserDropdown.install": "Installer l’application",
+  "components.PWAInstallPrompt.close": "Fermer",
+  "components.PWAInstallPrompt.ios": "Dans Safari, touchez Partager, puis Sur l’écran d’accueil et confirmez l’ajout.",
+  "components.PWAInstallPrompt.mac": "Dans Safari, ouvrez Fichier, puis Ajouter au Dock.",
+  "components.PWAInstallPrompt.android": "Ouvrez le menu du navigateur et choisissez Installer l’application ou Ajouter à l’écran d’accueil. Si cette option est absente, ouvrez ce site dans Chrome ou Edge.",
+  "components.PWAInstallPrompt.desktop": "Dans Chrome ou Edge, utilisez l’icône d’installation dans la barre d’adresse, ou ouvrez le menu du navigateur puis Applications → Installer ce site en tant qu’application.",
   "components.RequestPipelineStatus.quotaExhausted": "Crédit du tracker épuisé ; attente de crédit ou d’une autre source compatible",
   "components.RequestPipelineStatus.creditLow": "Cette version dépasse le crédit disponible ; recherche d’autres sources compatibles",
   "components.RequestPipelineStatus.creditStale": "Le crédit du tracker n’a pas pu être vérifié ; nouveaux téléchargements suspendus",
