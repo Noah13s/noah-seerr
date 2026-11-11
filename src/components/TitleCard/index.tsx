@@ -10,9 +10,9 @@ import Placeholder from '@app/components/TitleCard/Placeholder';
 import WatchStatusBadge from '@app/components/WatchHistory/WatchStatusBadge';
 import { useIsTouch } from '@app/hooks/useIsTouch';
 import useSettings from '@app/hooks/useSettings';
-import useWatchHistoryStatus from '@app/hooks/useWatchHistoryStatus';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import useWatchHistoryStatus from '@app/hooks/useWatchHistoryStatus';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { withProperties } from '@app/utils/typeHelpers';
@@ -322,9 +322,17 @@ const TitleCard = ({
   );
 
   const { currentSettings } = useSettings();
-  const showHideButton = currentSettings.blocklistEnabled !== false && hasPermission([Permission.MANAGE_BLOCKLIST], {
-    type: 'or',
-  });
+  const showHideButton =
+    currentSettings.blocklistEnabled !== false &&
+    hasPermission([Permission.MANAGE_BLOCKLIST], {
+      type: 'or',
+    });
+  const mediaHref =
+    mediaType === 'movie'
+      ? `/movie/${id}`
+      : mediaType === 'collection'
+        ? `/collection/${id}`
+        : `/tv/${id}`;
 
   return (
     <div
@@ -375,29 +383,38 @@ const TitleCard = ({
           }
         }}
         onMouseLeave={() => setShowDetail(false)}
-        onClick={() => setShowDetail(true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+        onFocusCapture={(event) => {
+          // Revealing an overlay during touch focus replaces the tap target
+          // before its click. Keyboard focus may reveal the preview safely.
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.matches(':focus-visible')
+          ) {
             setShowDetail(true);
           }
         }}
-        role="link"
-        tabIndex={0}
       >
         <div className="absolute inset-0 h-full w-full overflow-hidden">
-          <CachedImage
-            type="tmdb"
-            className="absolute inset-0 h-full w-full"
-            alt=""
-            src={
-              image
-                ? `https://image.tmdb.org/t/p/w300_and_h450_face${image}`
-                : `/images/seerr_poster_not_found_logo_top.png`
-            }
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            fill
-          />
-          <div className="absolute left-0 right-0 flex items-center justify-between p-2">
+          <Link
+            href={mediaHref}
+            aria-label={title}
+            data-testid="title-card-link"
+            className="absolute inset-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          >
+            <CachedImage
+              type="tmdb"
+              className="absolute inset-0 h-full w-full"
+              alt=""
+              src={
+                image
+                  ? `https://image.tmdb.org/t/p/w300_and_h450_face${image}`
+                  : `/images/seerr_poster_not_found_logo_top.png`
+              }
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              fill
+            />
+          </Link>
+          <div className="pointer-events-none absolute left-0 right-0 flex items-center justify-between p-2">
             <div
               className={`pointer-events-none z-40 self-start rounded-full border shadow-md ${
                 mediaType === 'movie' || mediaType === 'collection'
@@ -416,42 +433,42 @@ const TitleCard = ({
             {showDetail &&
               (currentSettings.blocklistEnabled === false ||
                 currentStatus !== MediaStatus.BLOCKLISTED) && (
-              <div className="flex flex-col gap-1">
-                {user?.userType !== UserType.PLEX &&
-                  (toggleWatchlist ? (
-                    <Button
-                      buttonType={'ghost'}
-                      className="z-40"
-                      buttonSize={'sm'}
-                      onClick={onClickWatchlistBtn}
-                    >
-                      <StarIcon className={'h-3 text-amber-300'} />
-                    </Button>
-                  ) : (
-                    <Button
-                      className="z-40"
-                      buttonSize={'sm'}
-                      onClick={onClickDeleteWatchlistBtn}
-                    >
-                      <MinusCircleIcon className={'h-3'} />
-                    </Button>
-                  ))}
-                {showHideButton &&
-                  currentStatus !== MediaStatus.PROCESSING &&
-                  currentStatus !== MediaStatus.AVAILABLE &&
-                  currentStatus !== MediaStatus.PARTIALLY_AVAILABLE &&
-                  currentStatus !== MediaStatus.PENDING && (
-                    <Button
-                      buttonType={'ghost'}
-                      className="z-40"
-                      buttonSize={'sm'}
-                      onClick={() => setShowBlocklistModal(true)}
-                    >
-                      <EyeSlashIcon className={'h-3'} />
-                    </Button>
-                  )}
-              </div>
-            )}
+                <div className="pointer-events-auto flex flex-col gap-1">
+                  {user?.userType !== UserType.PLEX &&
+                    (toggleWatchlist ? (
+                      <Button
+                        buttonType={'ghost'}
+                        className="z-40"
+                        buttonSize={'sm'}
+                        onClick={onClickWatchlistBtn}
+                      >
+                        <StarIcon className={'h-3 text-amber-300'} />
+                      </Button>
+                    ) : (
+                      <Button
+                        className="z-40"
+                        buttonSize={'sm'}
+                        onClick={onClickDeleteWatchlistBtn}
+                      >
+                        <MinusCircleIcon className={'h-3'} />
+                      </Button>
+                    ))}
+                  {showHideButton &&
+                    currentStatus !== MediaStatus.PROCESSING &&
+                    currentStatus !== MediaStatus.AVAILABLE &&
+                    currentStatus !== MediaStatus.PARTIALLY_AVAILABLE &&
+                    currentStatus !== MediaStatus.PENDING && (
+                      <Button
+                        buttonType={'ghost'}
+                        className="z-40"
+                        buttonSize={'sm'}
+                        onClick={() => setShowBlocklistModal(true)}
+                      >
+                        <EyeSlashIcon className={'h-3'} />
+                      </Button>
+                    )}
+                </div>
+              )}
             {showDetail &&
               showHideButton &&
               currentStatus == MediaStatus.BLOCKLISTED && (
@@ -462,7 +479,7 @@ const TitleCard = ({
                 >
                   <Button
                     buttonType={'ghost'}
-                    className="z-40"
+                    className="pointer-events-auto z-40"
                     buttonSize={'sm'}
                     onClick={() => onClickShowBlocklistBtn()}
                   >
@@ -514,13 +531,9 @@ const TitleCard = ({
           >
             <div className="absolute inset-0 overflow-hidden rounded-xl">
               <Link
-                href={
-                  mediaType === 'movie'
-                    ? `/movie/${id}`
-                    : mediaType === 'collection'
-                      ? `/collection/${id}`
-                      : `/tv/${id}`
-                }
+                href={mediaHref}
+                tabIndex={-1}
+                aria-hidden="true"
                 className="absolute inset-0 h-full w-full cursor-pointer overflow-hidden text-left"
                 style={{
                   background:
@@ -533,11 +546,11 @@ const TitleCard = ({
                       action
                         ? 'pb-14'
                         : !showRequestButton ||
-                      (currentStatus &&
-                        currentStatus !== MediaStatus.UNKNOWN &&
-                        currentStatus !== MediaStatus.DELETED)
-                        ? 'pb-2'
-                        : 'pb-11'
+                            (currentStatus &&
+                              currentStatus !== MediaStatus.UNKNOWN &&
+                              currentStatus !== MediaStatus.DELETED)
+                          ? 'pb-2'
+                          : 'pb-11'
                     }`}
                   >
                     {year && <div className="text-sm font-medium">{year}</div>}
@@ -558,13 +571,12 @@ const TitleCard = ({
                     <div
                       className="whitespace-normal text-xs"
                       style={{
-                        WebkitLineClamp:
-                          action
-                            ? 2
-                            : !showRequestButton ||
-                          (currentStatus &&
-                            currentStatus !== MediaStatus.UNKNOWN &&
-                            currentStatus !== MediaStatus.DELETED)
+                        WebkitLineClamp: action
+                          ? 2
+                          : !showRequestButton ||
+                              (currentStatus &&
+                                currentStatus !== MediaStatus.UNKNOWN &&
+                                currentStatus !== MediaStatus.DELETED)
                             ? 5
                             : 3,
                         display: '-webkit-box',
@@ -579,8 +591,10 @@ const TitleCard = ({
                 </div>
               </Link>
 
-              <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 py-2">
-                {action}
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex justify-between px-2 py-2">
+                {action && (
+                  <div className="pointer-events-auto w-full">{action}</div>
+                )}
                 {showRequestButton &&
                   !action &&
                   (!currentStatus ||
@@ -593,7 +607,7 @@ const TitleCard = ({
                         e.preventDefault();
                         setShowRequestModal(true);
                       }}
-                      className="h-7 w-full"
+                      className="pointer-events-auto h-7 w-full"
                     >
                       <ArrowDownTrayIcon />
                       <span>{intl.formatMessage(globalMessages.request)}</span>
@@ -604,7 +618,9 @@ const TitleCard = ({
                 <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden bg-black/70">
                   <div
                     className="h-full bg-indigo-500"
-                    style={{ width: `${Math.max(0, Math.min(100, actionProgress))}%` }}
+                    style={{
+                      width: `${Math.max(0, Math.min(100, actionProgress))}%`,
+                    }}
                   />
                 </div>
               )}

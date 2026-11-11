@@ -8740,6 +8740,8 @@ paths:
               properties:
                 rating:
                   type: integer
+                  nullable: true
+                  description: Set null to clear a rating.
                   minimum: 1
                   maximum: 5
       responses:

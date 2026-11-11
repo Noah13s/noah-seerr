@@ -8,6 +8,7 @@ import StatusChecker from '@app/components/StatusChecker';
 import { CastingProvider } from '@app/context/CastingContext';
 import { InteractionProvider } from '@app/context/InteractionContext';
 import { LanguageContext } from '@app/context/LanguageContext';
+import { PWAInstallProvider } from '@app/context/PWAInstallContext';
 import { SettingsProvider } from '@app/context/SettingsContext';
 import { UserContext } from '@app/context/UserContext';
 import type { User } from '@app/hooks/useUser';
@@ -226,13 +227,15 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
                   applicationTitle={currentSettings.applicationTitle}
                 />
               </Head>
-              <StatusChecker />
-              <ServiceWorkerSetup />
-              <PWAInstallPrompt />
-              <UserContext initialUser={user}>
-                <OfflineDownloadBootstrap />
-                <CastingProvider>{component}</CastingProvider>
-              </UserContext>
+              <PWAInstallProvider>
+                <StatusChecker />
+                <ServiceWorkerSetup />
+                <PWAInstallPrompt />
+                <UserContext initialUser={user}>
+                  <OfflineDownloadBootstrap />
+                  <CastingProvider>{component}</CastingProvider>
+                </UserContext>
+              </PWAInstallProvider>
               <Toaster
                 position="top-right"
                 toastOptions={{ duration: 4000 }}
