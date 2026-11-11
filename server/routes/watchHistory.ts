@@ -531,7 +531,7 @@ watchHistoryRoutes.delete('/:id/rewatch', async (req, res, next) => {
 watchHistoryRoutes.patch('/:id/rating', async (req, res, next) => {
   try {
     const { rating } = z
-      .object({ rating: z.number().int().min(1).max(5) })
+      .object({ rating: z.number().int().min(1).max(5).nullable() })
       .parse(req.body);
     const repository = getRepository(WatchHistory);
     const entry = await repository.findOne({
