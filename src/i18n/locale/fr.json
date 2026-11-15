@@ -871,7 +871,7 @@
   "components.QuotaSelector.days": "{count, plural, one {jour} other {jours}}",
   "components.UserProfile.UserSettings.UserGeneralSettings.languageDefault": "Par défaut ({language})",
   "components.Settings.webAppUrlTip": "Rediriger éventuellement les utilisateurs vers l'application web de votre serveur plutôt que vers https://app.plex.tv/desktop",
-  "components.Settings.webAppUrl": "URL de l'<WebAppLink>application web</WebAppLink>",
+  "components.Settings.webAppUrl": "URL <WebAppLink>application web</WebAppLink>",
   "components.Settings.noDefault4kServer": "Un serveur {serverType} 4K doit être défini par défaut pour permettre aux utilisateurs de faire des demandes de {mediaType} en 4K.",
   "components.Settings.is4k": "4K",
   "components.Settings.SettingsUsers.newPlexLoginTip": "Autoriser les utilisateurs {mediaServerName} à se connecter sans avoir été importés",
@@ -1836,5 +1836,10 @@
   "components.Discover.personalRecommendations": "Recommandé pour vous",
   "components.RequestPipelineStatus.trackerDenied": "Le tracker privé refuse l’accès ; vérifiez le compte ou choisissez une autre version",
   "components.RequestPipelineStatus.trackersUnreachable": "Les trackers sont injoignables ; vérifiez leur connexion ou choisissez une autre version",
-  "components.RequestPipelineStatus.importRejected": "Import bloqué ; vérifiez la version et la correspondance des épisodes dans Sonarr"
+  "components.RequestPipelineStatus.importRejected": "Import bloqué ; vérifiez la version et la correspondance des épisodes dans Sonarr",
+  "components.Settings.SettingsMain.hideRequested": "Masquer les médias demandés",
+  "components.Settings.SettingsMain.hideRequestedTip": "Masquer les médias déjà demandés des pages Découvrir, mais pas des résultats de recherche",
+  "components.Login.demoModeInfo": "Le mode démo est activé. Utilisez les identifiants de démonstration pour vous connecter.",
+  "components.Settings.Notifications.NotificationsNtfy.tagsPlaceholder": "eyes,warning",
+  "components.RequestModal.noSeasonsAvailable": "Toutes les saisons sélectionnées sont déjà demandées ou disponibles."
 }

@@ -19,6 +19,8 @@ import ExternalLinkBlock from '@app/components/ExternalLinkBlock';
 import IssueModal from '@app/components/IssueModal';
 import ManageSlideOver from '@app/components/ManageSlideOver';
 import MediaSlider from '@app/components/MediaSlider';
+import MediaTechnicalDetails from '@app/components/MediaTechnicalDetails';
+import MediaUpgrade from '@app/components/MediaUpgrade';
 import PersonCard from '@app/components/PersonCard';
 import RequestButton from '@app/components/RequestButton';
 import RequestModal from '@app/components/RequestModal';
@@ -26,21 +28,19 @@ import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
 import Season from '@app/components/TvDetails/Season';
 import MediaWatchEditor from '@app/components/WatchHistory/MediaWatchEditor';
-import MediaUpgrade from '@app/components/MediaUpgrade';
-import MediaTechnicalDetails from '@app/components/MediaTechnicalDetails';
 import WatchStatusBadge from '@app/components/WatchHistory/WatchStatusBadge';
 import useDeepLinks from '@app/hooks/useDeepLinks';
-import useWatchHistoryStatus from '@app/hooks/useWatchHistoryStatus';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
-import { getNextTvRelease } from '@app/utils/releaseDates';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import useWatchHistoryStatus from '@app/hooks/useWatchHistoryStatus';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
-import { refreshIntervalHelper } from '@app/utils/refreshIntervalHelper';
+import { mediaRefreshInterval } from '@app/utils/refreshIntervalHelper';
+import { getNextTvRelease } from '@app/utils/releaseDates';
 import {
   Disclosure,
   DisclosureButton,
@@ -74,7 +74,14 @@ import { countries } from 'country-flag-icons';
 import 'country-flag-icons/3x2/flags.css';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -129,12 +136,14 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   const router = useRouter();
   const selectedSeason = Number(router.query.season);
   const selectedEpisode = Number(router.query.episode);
-  const focusedSeason = Number.isInteger(selectedSeason) && selectedSeason > 0
-    ? selectedSeason
-    : undefined;
-  const focusedEpisode = Number.isInteger(selectedEpisode) && selectedEpisode > 0
-    ? selectedEpisode
-    : undefined;
+  const focusedSeason =
+    Number.isInteger(selectedSeason) && selectedSeason > 0
+      ? selectedSeason
+      : undefined;
+  const focusedEpisode =
+    Number.isInteger(selectedEpisode) && selectedEpisode > 0
+      ? selectedEpisode
+      : undefined;
   const intl = useIntl();
   const { locale } = useLocale();
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -152,6 +161,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     Number(router.query.tvId),
     'tv'
   );
+  const sawDownload = useRef(false);
 
   const {
     data,
@@ -159,7 +169,12 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     mutate: revalidate,
   } = useSWR<TvDetailsType>(`/api/v1/tv/${router.query.tvId}`, {
     fallbackData: tv,
-    refreshInterval: 15000,
+    refreshInterval: (latest) =>
+      mediaRefreshInterval(latest?.mediaInfo, sawDownload, 15000) ||
+      (latest?.mediaInfo?.status === MediaStatus.PROCESSING ||
+      latest?.mediaInfo?.status4k === MediaStatus.PROCESSING
+        ? 15000
+        : 0),
     revalidateOnFocus: true,
   });
 
@@ -175,10 +190,14 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   useEffect(() => {
     if (router.query.manage === '1') {
       setShowManager(true);
-      router.replace({
-        pathname: router.pathname,
-        query: { tvId: router.query.tvId },
-      });
+      router.replace(
+        {
+          pathname: router.pathname,
+          query: { tvId: router.query.tvId },
+        },
+        undefined,
+        { shallow: true }
+      );
     }
   }, [router, router.query.manage]);
 
@@ -502,9 +521,11 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     closeBlocklistModal();
   };
 
-  const showHideButton = settings.currentSettings.blocklistEnabled !== false && hasPermission([Permission.MANAGE_BLOCKLIST], {
-    type: 'or',
-  });
+  const showHideButton =
+    settings.currentSettings.blocklistEnabled !== false &&
+    hasPermission([Permission.MANAGE_BLOCKLIST], {
+      type: 'or',
+    });
 
   return (
     <div
@@ -562,10 +583,14 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
         mediaType="tv"
         onClose={() => {
           setShowManager(false);
-          router.replace({
-            pathname: router.pathname,
-            query: { tvId: router.query.tvId },
-          });
+          router.replace(
+            {
+              pathname: router.pathname,
+              query: { tvId: router.query.tvId },
+            },
+            undefined,
+            { shallow: true }
+          );
         }}
         revalidate={() => revalidate()}
         show={showManager}
@@ -656,17 +681,18 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             tmdbId={data.id}
             mediaType="tv"
             title={data.name}
-            releaseYear={data.firstAirDate ? Number(data.firstAirDate.slice(0, 4)) : undefined}
+            releaseYear={
+              data.firstAirDate
+                ? Number(data.firstAirDate.slice(0, 4))
+                : undefined
+            }
             seasons={data.seasons}
           />
           {data.mediaInfo &&
             (data.mediaInfo.status === MediaStatus.AVAILABLE ||
               data.mediaInfo.status === MediaStatus.PARTIALLY_AVAILABLE) &&
             hasPermission(Permission.MANAGE_REQUESTS) && (
-              <MediaUpgrade
-                tmdbId={data.id}
-                mediaType={MediaType.TV}
-              />
+              <MediaUpgrade tmdbId={data.id} mediaType={MediaType.TV} />
             )}
           {showHideButton &&
             data?.mediaInfo?.status !== MediaStatus.PROCESSING &&
@@ -736,14 +762,17 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
           />
           {settings.currentSettings.issuesEnabled !== false &&
             (data.mediaInfo?.status === MediaStatus.AVAILABLE ||
-            data.mediaInfo?.status === MediaStatus.PARTIALLY_AVAILABLE ||
-            (settings.currentSettings.series4kEnabled &&
-              hasPermission([Permission.REQUEST_4K, Permission.REQUEST_4K_TV], {
-                type: 'or',
-              }) &&
-              (data.mediaInfo?.status4k === MediaStatus.AVAILABLE ||
-                data?.mediaInfo?.status4k ===
-                  MediaStatus.PARTIALLY_AVAILABLE))) &&
+              data.mediaInfo?.status === MediaStatus.PARTIALLY_AVAILABLE ||
+              (settings.currentSettings.series4kEnabled &&
+                hasPermission(
+                  [Permission.REQUEST_4K, Permission.REQUEST_4K_TV],
+                  {
+                    type: 'or',
+                  }
+                ) &&
+                (data.mediaInfo?.status4k === MediaStatus.AVAILABLE ||
+                  data?.mediaInfo?.status4k ===
+                    MediaStatus.PARTIALLY_AVAILABLE))) &&
             hasPermission(
               [Permission.CREATE_ISSUES, Permission.MANAGE_ISSUES],
               {
@@ -1163,7 +1192,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                               }
                               isAvailable={
                                 mSeason?.status === MediaStatus.AVAILABLE ||
-                                mSeason?.status === MediaStatus.PARTIALLY_AVAILABLE
+                                mSeason?.status ===
+                                  MediaStatus.PARTIALLY_AVAILABLE
                               }
                             />
                           </DisclosurePanel>

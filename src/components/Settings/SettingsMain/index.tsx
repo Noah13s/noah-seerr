@@ -56,7 +56,8 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   hideBlocklistedTip:
     'Hide blocklisted items from discover pages for all users with the "Manage Blocklist" permission',
   issuesEnabled: 'Enable issue reporting',
-  issuesEnabledTip: 'Show issue reporting and allow users to submit and manage issues.',
+  issuesEnabledTip:
+    'Show issue reporting and allow users to submit and manage issues.',
   blocklistEnabled: 'Enable blocklist',
   blocklistEnabledTip: 'Show and enforce the blocklist across the app.',
   toastApiKeySuccess: 'New API key generated successfully!',
@@ -84,7 +85,6 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   versionCheck: 'Version Check',
   versionCheckTip: 'Automatically check for new versions on GitHub.',
   validationUrl: 'You must provide a valid URL',
-  validationUrlTrailingSlash: 'URL must not end in a trailing slash',
 });
 
 const SettingsMain = () => {
@@ -127,13 +127,7 @@ const SettingsMain = () => {
         'Number must be less than or equal to 250.',
         (value) => (value ?? 0) <= 250
       ),
-    youtubeUrl: Yup.string()
-      .url(intl.formatMessage(messages.validationUrl))
-      .test(
-        'no-trailing-slash',
-        intl.formatMessage(messages.validationUrlTrailingSlash),
-        (value) => !value || !value.endsWith('/')
-      ),
+    youtubeUrl: Yup.string().url(intl.formatMessage(messages.validationUrl)),
   });
 
   const regenerate = async () => {
@@ -532,30 +526,32 @@ const SettingsMain = () => {
                     />
                   </div>
                 </div>
-                {(['issuesEnabled', 'blocklistEnabled'] as const).map((name) => (
-                  <div className="form-row" key={name}>
-                    <label htmlFor={name} className="checkbox-label">
-                      <span className="mr-2">
-                        {intl.formatMessage(messages[name])}
-                      </span>
-                      <span className="label-tip">
-                        {intl.formatMessage(
-                          name === 'issuesEnabled'
-                            ? messages.issuesEnabledTip
-                            : messages.blocklistEnabledTip
-                        )}
-                      </span>
-                    </label>
-                    <div className="form-input-area">
-                      <Field
-                        type="checkbox"
-                        id={name}
-                        name={name}
-                        onChange={() => setFieldValue(name, !values[name])}
-                      />
+                {(['issuesEnabled', 'blocklistEnabled'] as const).map(
+                  (name) => (
+                    <div className="form-row" key={name}>
+                      <label htmlFor={name} className="checkbox-label">
+                        <span className="mr-2">
+                          {intl.formatMessage(messages[name])}
+                        </span>
+                        <span className="label-tip">
+                          {intl.formatMessage(
+                            name === 'issuesEnabled'
+                              ? messages.issuesEnabledTip
+                              : messages.blocklistEnabledTip
+                          )}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <Field
+                          type="checkbox"
+                          id={name}
+                          name={name}
+                          onChange={() => setFieldValue(name, !values[name])}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                )}
                 <div className="form-row">
                   <label htmlFor="hideBlocklisted" className="checkbox-label">
                     <span className="mr-2">

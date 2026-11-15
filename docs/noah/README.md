@@ -8,6 +8,7 @@
 | You are setting up a checkout | [Installation](installation.md) |
 | You are changing the bridge, UI or backend | [Development](development.md) |
 | You are releasing or updating a fork | [Deployment and updates](deployment.md) |
+| You need the 3.5.2 changes and compatibility decisions | [3.5.2 upgrade review](upgrade-3.5.2.md) |
 | You need playback, history, pairing or profile behavior | [Playback and features](playback.md) |
 | You need admin panels, cleanup countdowns or activity history | [Administration](../admin-tools.md) |
 | A request is searching, importing or delayed | [Request progress](request-pipeline.md) |
