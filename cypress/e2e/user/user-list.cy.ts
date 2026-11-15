@@ -22,10 +22,10 @@ describe('User List', () => {
     cy.visit('/users');
 
     cy.get('[data-testid=user-list-row]')
-      .contains(Cypress.env('ADMIN_EMAIL'))
+      .contains(Cypress.expose('ADMIN_EMAIL'))
       .should('be.visible');
     cy.get('[data-testid=user-list-row]')
-      .contains(Cypress.env('USER_EMAIL'))
+      .contains(Cypress.expose('USER_EMAIL'))
       .should('be.visible');
   });
 

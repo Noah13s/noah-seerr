@@ -110,7 +110,7 @@ for (const type of [
     assert.equal(f.reset.mock.callCount(), 1);
     assert.deepEqual(
       f.clear.mock.calls.map((call) => call.arguments),
-      [['tmdb'], ['avatar']]
+      [['tmdb'], ['tvdb'], ['avatar']]
     );
   });
 }

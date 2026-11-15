@@ -50,9 +50,16 @@ waits for the expected manifest after Nginx's asynchronous reload.
 
 ## Upstream update policy
 
-The reviewed upstream base is Seerr **v3.5.0**. GitHub may compare this fork
+The reviewed upstream base is Seerr **v3.5.2**. GitHub may compare this fork
 with upstream `develop`, which includes unreleased work. Choose a stable tag
 deliberately and preserve its ancestry on a review branch.
+
+For every update, first read the official release notes and compare the stable
+tags, including security fixes, migrations, API changes, dependency/runtime
+versions and features relevant to this installation. Record which improvements
+are adopted automatically and which need separate work; do not update a version
+label without updating its running code and dependencies. See the
+[3.5.2 upgrade review](upgrade-3.5.2.md).
 
 Review custom auth routes, history/rewatch, availability/deletion state, pairing,
 cleanup and the source-player bridge. Run frontend and backend-specific gates;
