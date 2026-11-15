@@ -38,3 +38,23 @@ image digest, changed compiled modules, frontend build identity, test results,
 configuration/database backups and rollback procedure. Verify both normal and
 administrator identities against an isolated copy before switching production.
 An image version string or a successful frontend build alone is insufficient.
+## Native playback contract follow-up
+
+The initial upgrade retained the native-session handler but omitted its OpenAPI
+path. The request validator therefore returned 404 before TV playback could
+authenticate. The schema now includes `/auth/jellyfin-native-session`; cookie
+authentication remains required. Regression tests check all maintained auth
+routes against the production schema and run native-session requests through
+the real validator, including anonymous and unknown-route rejection.
+
+The schema-only correction is live in image `3.5.2-121`. Physical TCL build 1056
+successfully authenticated and reached 1080p Direct Play in about 4.1 seconds
+after a single retry. No APK update was required. The initial source-route gate
+was insufficient to validate this boundary; keep the new schema tests in the
+required suite for future upstream merges.
+
+The CI coverage follow-up adds session linking/reuse, scoped logout, activity,
+warmup and diagnostic-limit tests. The local full suite passed 460 cases; the
+expanded focused auth/schema run passed 64 cases, and lint/server type checking
+passed. The previously uncovered changed auth lines are now exercised. Fresh
+Sonar confirmation remains pending; the 80% gate is unchanged.

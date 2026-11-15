@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { before, beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import JellyfinAPI from '@server/api/jellyfin';
+import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
+import * as schedule from '@server/job/schedule';
 import PreparedEmail from '@server/lib/email';
 import ImageProxy from '@server/lib/imageproxy';
 import { getSettings } from '@server/lib/settings';
@@ -18,6 +20,7 @@ import {
   seedUserSettings,
 } from '@server/test/userSettings';
 import { ApiError } from '@server/types/error';
+import type { AxiosRequestConfig } from 'axios';
 import axios from 'axios';
 import type { Express } from 'express';
 import express from 'express';
@@ -164,6 +167,295 @@ function configureJellyfin() {
   settings.jellyfin.useSsl = false;
   settings.jellyfin.urlBase = '';
 }
+
+describe('Playback authentication and activity boundaries', () => {
+  const account = {
+    ...defaultAuthenticateResponse.User,
+    Id: '0123456789abcdef0123456789abcdef',
+    Name: 'seerr-2',
+    Policy: {
+      IsAdministrator: false,
+      IsDisabled: false,
+      EnableMediaPlayback: true,
+    },
+  };
+  const restorers: (() => void)[] = [];
+  afterEach(() => {
+    for (const restore of restorers.splice(0)) restore();
+  });
+
+  async function linkedAgent() {
+    configureJellyfin();
+    const settings = getSettings();
+    settings.jellyfin.apiKey = 'fixture-admin-key';
+    settings.jellyfin.serverId = 'fixture-server';
+    await getRepository(User).update(
+      { email: 'demo@seerr.dev' },
+      {
+        jellyfinUserId: account.Id,
+        jellyfinUsername: account.Name,
+      }
+    );
+    const transport = mock.method(
+      axios,
+      'request',
+      async (config: AxiosRequestConfig) => {
+        const url = String(config.url);
+        if (
+          url.endsWith('/QuickConnect/Enabled') ||
+          url.endsWith('/QuickConnect/Authorize')
+        )
+          return { data: true };
+        if (url.endsWith('/QuickConnect/Initiate'))
+          return { data: { Secret: 'fixture-secret', Code: '123456' } };
+        if (url.endsWith('/Users/AuthenticateWithQuickConnect'))
+          return { data: { User: account, AccessToken: 'fixture-user-token' } };
+        if (config.method === 'GET' && url.includes('/Users/'))
+          return { data: account };
+        throw new Error('Unexpected playback request');
+      }
+    );
+    restorers.push(() => transport.mock.restore());
+    return {
+      agent: await authenticatedAgent('demo@seerr.dev', 'test1234'),
+      transport,
+    };
+  }
+
+  it('rejects anonymous access and non-Jellyfin installations', async () => {
+    for (const path of ['/jellyfin-session', '/jellyfin-native-session']) {
+      assert.equal((await request(app).get('/auth' + path)).status, 403);
+    }
+    const { agent } = await linkedAgent();
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    for (const path of ['/jellyfin-session', '/jellyfin-native-session']) {
+      const res = await agent.get('/auth' + path);
+      assert.equal(res.status, 409);
+      assert.equal(res.body.code, 'JELLYFIN_NOT_CONFIGURED');
+    }
+  });
+
+  it('keeps browser and native tokens scoped and reuses each established session', async () => {
+    const { agent, transport } = await linkedAgent();
+    const devices = new Set();
+    for (const path of ['/jellyfin-session', '/jellyfin-native-session']) {
+      const res = await agent.get('/auth' + path);
+      assert.equal(res.status, 200);
+      assert.equal(res.headers['cache-control'], 'private, no-store');
+      assert.equal(res.body.accessToken, 'fixture-user-token');
+      assert.equal(res.body.userId, account.Id);
+      devices.add(res.body.deviceId);
+      const again = await agent.get('/auth' + path);
+      assert.equal(again.body.deviceId, res.body.deviceId);
+    }
+    assert.equal(devices.size, 2);
+    assert.equal(
+      transport.mock.calls.filter((c) =>
+        c.arguments[0].url?.endsWith('/QuickConnect/Initiate')
+      ).length,
+      2
+    );
+  });
+
+  for (const reuse of [true, false]) {
+    it(`links an unlinked Seerr profile by ${reuse ? 'reusing' : 'creating'} its managed account`, async () => {
+      const { agent } = await linkedAgent();
+      await getRepository(User).update(
+        { email: 'demo@seerr.dev' },
+        { jellyfinUserId: null }
+      );
+      const users = mock.method(
+        JellyfinAPI.prototype,
+        'getUsers',
+        async () => ({ users: reuse ? [account] : [] })
+      );
+      const create = mock.method(
+        JellyfinAPI.prototype,
+        'createUser',
+        async () => account
+      );
+      restorers.push(
+        () => users.mock.restore(),
+        () => create.mock.restore()
+      );
+      const res = await agent.get('/auth/jellyfin-session');
+      assert.equal(res.status, 200);
+      assert.equal(create.mock.calls.length, reuse ? 0 : 1);
+      const saved = await getRepository(User).findOneByOrFail({
+        email: 'demo@seerr.dev',
+      });
+      assert.equal(saved.jellyfinUserId, account.Id);
+      if (!reuse)
+        assert.ok((create.mock.calls[0].arguments[1]?.length ?? 0) >= 48);
+    });
+  }
+
+  it('does not silently replace a different existing account mapping', async () => {
+    const { agent } = await linkedAgent();
+    await getRepository(User).update(
+      { email: 'demo@seerr.dev' },
+      { jellyfinUserId: null, jellyfinUsername: 'different-user' }
+    );
+    const res = await agent.get('/auth/jellyfin-session');
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'JELLYFIN_RELINK_REQUIRED');
+  });
+
+  it('revokes only the browser and native devices issued to this session on logout', async () => {
+    const { agent } = await linkedAgent();
+    const web = await agent.get('/auth/jellyfin-session');
+    const native = await agent.get('/auth/jellyfin-native-session');
+    const revoke = mock.method(
+      axios,
+      'delete',
+      async (url: string, config?: AxiosRequestConfig) => {
+        assert.ok(url.endsWith('/Devices'));
+        assert.ok(config?.params?.Id);
+        return { status: 204 };
+      }
+    );
+    restorers.push(() => revoke.mock.restore());
+    assert.equal((await agent.post('/auth/logout')).status, 200);
+    assert.deepEqual(
+      new Set(revoke.mock.calls.map((call) => call.arguments[1]?.params.Id)),
+      new Set([web.body.deviceId, native.body.deviceId])
+    );
+    assert.ok(
+      revoke.mock.calls.every(
+        (call) =>
+          call.arguments[1]?.timeout === 8000 &&
+          call.arguments[1]?.maxRedirects === 0
+      )
+    );
+    assert.equal(
+      (await agent.get('/auth/jellyfin-native-session')).status,
+      403
+    );
+  });
+
+  it('restores Plex configuration when the existing owner signs into an unconfigured server', async () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    const account = mock.method(PlexTvAPI.prototype, 'getUser', async () => ({
+      id: 1,
+      email: 'admin@seerr.dev',
+      username: 'admin',
+      authToken: 'fixture-plex-token',
+      thumb: '',
+    }));
+    const save = mock.method(settings, 'save', async () => undefined);
+    const jobs = mock.method(schedule, 'startJobs', () => undefined);
+    restorers.push(
+      () => account.mock.restore(),
+      () => save.mock.restore(),
+      () => jobs.mock.restore()
+    );
+    const res = await request(app)
+      .post('/auth/plex')
+      .send({ authToken: 'fixture-plex-token' });
+    assert.equal(res.status, 200);
+    assert.equal(settings.main.mediaServerType, MediaServerType.PLEX);
+    assert.equal(save.mock.calls.length, 1);
+    assert.equal(jobs.mock.calls.length, 1);
+  });
+
+  it('returns bounded public errors instead of backend details or credentials', async () => {
+    const { agent, transport } = await linkedAgent();
+    for (const status of [403, 503]) {
+      transport.mock.mockImplementation(async () => {
+        throw { response: { status }, message: 'private backend details' };
+      });
+      for (const path of ['/jellyfin-session', '/jellyfin-native-session']) {
+        const res = await agent.get('/auth' + path);
+        assert.equal(res.status, status === 403 ? 403 : 502);
+        assert.equal(res.body.code, 'JELLYFIN_SESSION_UNAVAILABLE');
+        assert.ok(!JSON.stringify(res.body).includes('private backend'));
+        assert.ok(!JSON.stringify(res.body).includes('fixture-admin-key'));
+      }
+    }
+  });
+
+  it('treats valid warmup as optional and rejects malformed item IDs', async () => {
+    const { agent } = await linkedAgent();
+    assert.equal(
+      (await agent.post('/auth/jellyfin-warm').send({ itemId: 'bad-id' }))
+        .status,
+      400
+    );
+    const warm = mock.method(axios, 'post', async () => {
+      throw new Error('Warm service unavailable');
+    });
+    restorers.push(() => warm.mock.restore());
+    const res = await agent
+      .post('/auth/jellyfin-warm')
+      .send({ itemId: 'a'.repeat(32) });
+    assert.equal(res.status, 204);
+    assert.equal(warm.mock.calls.length, 1);
+    assert.equal(
+      warm.mock.calls[0].arguments[2]?.headers?.Authorization,
+      'MediaBrowser Token="fixture-user-token"'
+    );
+  });
+
+  it('records activity once within the debounce window and refreshes stale activity', async () => {
+    const { agent } = await linkedAgent();
+    const repo = getRepository(User);
+    await repo.update({ email: 'demo@seerr.dev' }, { lastActiveAt: null });
+    assert.equal((await agent.post('/auth/activity')).status, 204);
+    const first = (await repo.findOneByOrFail({ email: 'demo@seerr.dev' }))
+      .lastActiveAt;
+    assert.ok(first);
+    await agent.post('/auth/activity');
+    assert.equal(
+      (
+        await repo.findOneByOrFail({ email: 'demo@seerr.dev' })
+      ).lastActiveAt?.getTime(),
+      first.getTime()
+    );
+    await repo.update(
+      { email: 'demo@seerr.dev' },
+      { lastActiveAt: new Date(0) }
+    );
+    await agent.post('/auth/activity');
+    assert.ok(
+      (
+        await repo.findOneByOrFail({ email: 'demo@seerr.dev' })
+      ).lastActiveAt!.getTime() > first.getTime()
+    );
+  });
+
+  it('limits diagnostics to admins, validates payloads and expires rate limits', async () => {
+    const { agent } = await linkedAgent();
+    const payload = { phase: 'snapshot', media: [] };
+    assert.equal(
+      (await agent.post('/auth/cast-diagnostics').send(payload)).status,
+      403
+    );
+    const admin = await authenticatedAgent('admin@seerr.dev', 'test1234');
+    assert.equal(
+      (await admin.post('/auth/cast-diagnostics').send({ phase: 'bad' }))
+        .status,
+      400
+    );
+    const now = Date.now();
+    const clock = mock.method(Date, 'now', () => now + 120000);
+    restorers.push(() => clock.mock.restore());
+    for (let i = 0; i < 120; i++)
+      assert.equal(
+        (await admin.post('/auth/cast-diagnostics').send(payload)).status,
+        204
+      );
+    assert.equal(
+      (await admin.post('/auth/cast-diagnostics').send(payload)).status,
+      429
+    );
+    clock.mock.mockImplementation(() => now + 240000);
+    assert.equal(
+      (await admin.post('/auth/cast-diagnostics').send(payload)).status,
+      204
+    );
+  });
+});
 
 describe('POST /auth/jellyfin/quickconnect/initiate', () => {
   beforeEach(() => {

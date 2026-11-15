@@ -4307,6 +4307,39 @@ paths:
                     type: string
         '409':
           description: The existing Jellyfin account must be linked again
+  /auth/jellyfin-native-session:
+    get:
+      summary: Prepare the current user's isolated native playback session
+      description: Returns a user-scoped Jellyfin token for the TV or native app. Requires an authenticated Seerr session and never returns the administrator API key.
+      tags:
+        - auth
+      responses:
+        '200':
+          description: Isolated Jellyfin session for the current native client
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [serverId, userId, accessToken, deviceId]
+                properties:
+                  serverId:
+                    type: string
+                  userId:
+                    type: string
+                  accessToken:
+                    type: string
+                  deviceId:
+                    type: string
+        '401':
+          description: A signed-in Seerr session is required
+        '403':
+          description: The linked account cannot play media
+        '409':
+          description: Jellyfin is not configured or the account requires relinking
+        '502':
+          description: The playback session could not be prepared
+        '503':
+          description: Jellyfin Quick Connect is unavailable
   /auth/jellyfin-warm:
     post:
       summary: Prepare the selected media disk and GPU for playback
