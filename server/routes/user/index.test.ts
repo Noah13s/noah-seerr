@@ -74,6 +74,95 @@ async function loginAs(email: string, password: string) {
   }
 }
 
+describe('GET /user last activity sorting', () => {
+  async function activityFixture() {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const times = [
+      null,
+      '2026-01-01',
+      '2026-03-01',
+      '2026-03-01',
+      '2026-02-01',
+      null,
+    ];
+    const users = await getRepository(User).save(
+      times.map(
+        (time, index) =>
+          new User({
+            email: `activity-${index}@seerr.dev`,
+            username: `activity-${index}`,
+            avatar: '',
+            lastActiveAt: time ? new Date(`${time}T12:00:00Z`) : null,
+          })
+      )
+    );
+    return { agent, users, includeIds: users.map((user) => user.id).join(',') };
+  }
+
+  it('defaults to newest activity instead of user ID', async () => {
+    const { agent, users, includeIds } = await activityFixture();
+    const res = await agent
+      .get('/user')
+      .query({ sort: 'lastactive', includeIds });
+    assert.equal(res.status, 200);
+    assert.deepEqual(
+      res.body.results.map((user: User) => user.id),
+      [2, 3, 4, 1, 0, 5].map((index) => users[index].id)
+    );
+  });
+
+  it('sorts oldest first while keeping unrecorded activity last', async () => {
+    const { agent, users, includeIds } = await activityFixture();
+    const res = await agent.get('/user').query({
+      sort: 'lastactive',
+      sortDirection: 'asc',
+      includeIds,
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(
+      res.body.results.map((user: User) => user.id),
+      [1, 4, 2, 3, 0, 5].map((index) => users[index].id)
+    );
+  });
+
+  it('keeps equal timestamps and missing activity stable across pages', async () => {
+    const { agent, users, includeIds } = await activityFixture();
+    const ids: number[] = [];
+    for (const skip of [0, 2, 4]) {
+      const res = await agent.get('/user').query({
+        sort: 'lastactive',
+        sortDirection: 'desc',
+        includeIds,
+        take: 2,
+        skip,
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.pageInfo.results, 6);
+      assert.equal(res.body.pageInfo.pages, 3);
+      ids.push(...res.body.results.map((user: User) => user.id));
+    }
+    assert.deepEqual(
+      ids,
+      [2, 3, 4, 1, 0, 5].map((index) => users[index].id)
+    );
+  });
+
+  it('preserves search and ID filtering when sorting by activity', async () => {
+    const { agent, users } = await activityFixture();
+    const res = await agent.get('/user').query({
+      sort: 'lastactive',
+      q: 'activity-',
+      includeIds: [users[0].id, users[1].id, users[4].id].join(','),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.pageInfo.results, 3);
+    assert.deepEqual(
+      res.body.results.map((user: User) => user.id),
+      [4, 1, 0].map((index) => users[index].id)
+    );
+  });
+});
+
 describe('GET /user/:id/watchlist', () => {
   it('omits notification settings from every requestedBy in the page', async () => {
     const owner = await seedUserSettings('demo@seerr.dev');

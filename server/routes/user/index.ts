@@ -62,6 +62,7 @@ router.get('/', async (req, res, next) => {
           break;
         case 'requests':
         case 'updated':
+        case 'lastactive':
           sortDirection = 'DESC';
           break;
         case 'created':
@@ -78,7 +79,7 @@ router.get('/', async (req, res, next) => {
 
     if (q) {
       query = query.where(
-        'LOWER(user.username) LIKE :q OR LOWER(user.email) LIKE :q OR LOWER(user.plexUsername) LIKE :q OR LOWER(user.jellyfinUsername) LIKE :q',
+        '(LOWER(user.username) LIKE :q OR LOWER(user.email) LIKE :q OR LOWER(user.plexUsername) LIKE :q OR LOWER(user.jellyfinUsername) LIKE :q)',
         { q: `%${q}%` }
       );
     }
@@ -93,6 +94,16 @@ router.get('/', async (req, res, next) => {
         break;
       case 'updated':
         query = query.orderBy('user.updatedAt', sortDirection);
+        break;
+      case 'lastactive':
+        query = query
+          .addSelect(
+            'CASE WHEN user.lastActiveAt IS NULL THEN 1 ELSE 0 END',
+            'last_active_missing'
+          )
+          .orderBy('last_active_missing', 'ASC')
+          .addOrderBy('user.lastActiveAt', sortDirection)
+          .addOrderBy('user.id', 'ASC');
         break;
       case 'displayname':
         query = query
