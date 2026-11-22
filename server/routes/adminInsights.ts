@@ -111,8 +111,18 @@ const fileBytes = async (directory: string): Promise<number> => {
 };
 
 const diskSnapshot = async () => {
+  const secondary = '/media2';
+  const mediaMounts = ['/media'];
+  // A missing bind mount must not be reported as space on the system disk.
+  const [system, extra] = await Promise.all([
+    stat('/app/config').catch(() => undefined),
+    stat(secondary).catch(() => undefined),
+  ]);
+  if (system && extra?.dev !== undefined && extra.dev !== system.dev) {
+    mediaMounts.push(secondary);
+  }
   const volumes = await Promise.all(
-    ['/app/config', '/media'].map(async (mount) => {
+    ['/app/config', ...mediaMounts].map(async (mount) => {
       try {
         const info = await statfs(mount, { bigint: true });
         return {
@@ -128,7 +138,11 @@ const diskSnapshot = async () => {
   const libraries = await Promise.all(
     ['films', 'series', 'imports'].map(async (name) => ({
       name,
-      bytes: await fileBytes(path.join('/media', name)),
+      bytes: (
+        await Promise.all(
+          mediaMounts.map((mount) => fileBytes(path.join(mount, name)))
+        )
+      ).reduce((total, bytes) => total + bytes, 0),
     }))
   );
   return { volumes, libraries };
