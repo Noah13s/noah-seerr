@@ -109,7 +109,8 @@ test('admin overview uses full width, separates panels and does not load hidden 
     disk: {
       volumes: [
         { mount: '/media', total: 1e12, free: 2e11 },
-        { mount: '/app/config', total: 1e9, free: 1e8 },
+        { mount: '/media2', total: 1e12, free: 1e11 },
+        { mount: '/app/config', total: 1e9, free: 5e8 },
       ],
       libraries: [{ name: 'films', bytes: 1e9 }],
     },
@@ -125,6 +126,15 @@ test('admin overview uses full width, separates panels and does not load hidden 
   assert.match(html, /max-w-\[1600px\]/);
   assert.match(html, /Historique d’activité/);
   assert.match(html, /Disque des médias/);
+  assert.match(html, /Disque des médias 2[^]*?bg-rose-500/);
+  assert.match(html, /Disque système[^]*?bg-indigo-500/);
+  const english = render(createElement(AdminToolsPage), {
+    '/api/v1/auth/me': { id: 1, permissions: 2 },
+    '/api/v1/admin-tools/insights': insights,
+  });
+  assert.match(english, /Media drive<[^]*?bg-emerald-500/);
+  assert.match(english, /Media drive 2[^]*?bg-rose-500/);
+  assert.match(english, /System drive/);
   assert.doesNotMatch(html, /<iframe/);
   assert.equal(
     render(createElement(AdminToolsPage), {

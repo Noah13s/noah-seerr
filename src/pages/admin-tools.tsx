@@ -255,24 +255,27 @@ const AdminToolsPage: NextPage = () => {
                         <DiskCard
                           key={volume.mount}
                           title={
-                            volume.mount === '/media'
+                            volume.mount === '/media2'
                               ? french
-                                ? 'Disque des médias'
-                                : 'Media drive'
-                              : french
-                                ? 'Disque système'
-                                : 'System drive'
+                                ? 'Disque des médias 2'
+                                : 'Media drive 2'
+                              : volume.mount === '/media'
+                                ? french
+                                  ? 'Disque des médias'
+                                  : 'Media drive'
+                                : french
+                                  ? 'Disque système'
+                                  : 'System drive'
                           }
                           french={french}
                           total={volume.total}
                           free={volume.free}
                           accent={
-                            volume.mount === '/media'
-                              ? 'bg-emerald-500'
-                              : volume.total &&
-                                  volume.free / volume.total < 0.15
-                                ? 'bg-rose-500'
-                                : 'bg-indigo-500'
+                            volume.total && volume.free / volume.total < 0.15
+                              ? 'bg-rose-500'
+                              : volume.mount === '/app/config'
+                                ? 'bg-indigo-500'
+                                : 'bg-emerald-500'
                           }
                         />
                       ))}
