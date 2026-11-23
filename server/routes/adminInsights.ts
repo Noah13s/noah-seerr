@@ -110,7 +110,7 @@ const fileBytes = async (directory: string): Promise<number> => {
   return sizes.reduce((sum, size) => sum + size, 0);
 };
 
-const diskSnapshot = async () => {
+export const diskSnapshot = async () => {
   const secondary = '/media2';
   const mediaMounts = ['/media'];
   // A missing bind mount must not be reported as space on the system disk.
